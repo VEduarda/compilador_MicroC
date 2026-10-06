@@ -65,11 +65,13 @@ public class Lexer {
      * como palavra reservada em vez de ID.
      */
     private void initializeKeywords() {
-        keywords.put("int",   TokenType.INT);
-        keywords.put("if",    TokenType.IF);
-        keywords.put("else",  TokenType.ELSE);
-        keywords.put("while", TokenType.WHILE);
-        keywords.put("print", TokenType.PRINT);
+        keywords.put("int",      TokenType.INT);
+        keywords.put("if",       TokenType.IF);
+        keywords.put("else",     TokenType.ELSE);
+        keywords.put("while",    TokenType.WHILE);
+        keywords.put("break",    TokenType.BREAK);
+        keywords.put("continue", TokenType.CONTINUE);
+        keywords.put("print",    TokenType.PRINT);
     }
 
     /*

@@ -26,7 +26,8 @@ public class Symbol {
     public enum Category {
         VARIABLE,
         PARAMETER,
-        FUNCTION
+        FUNCTION,
+        CONSTANT
     }
 
     public final String name;
@@ -36,6 +37,7 @@ public class Symbol {
     public final int line;
 
     public boolean initialized;
+    public String constantValue;
 
     public Symbol(
             String name,
@@ -45,23 +47,42 @@ public class Symbol {
             int line,
             boolean initialized) {
 
+        this(name, type, category, scopeLevel, line, initialized, null);
+    }
+
+    public Symbol(
+            String name,
+            String type,
+            Category category,
+            int scopeLevel,
+            int line,
+            boolean initialized,
+            String constantValue) {
+
         this.name = name;
         this.type = type;
         this.category = category;
         this.scopeLevel = scopeLevel;
         this.line = line;
         this.initialized = initialized;
+        this.constantValue = constantValue;
+    }
+
+    public boolean isConstant() {
+        return category == Category.CONSTANT || constantValue != null;
     }
 
     @Override
     public String toString() {
+        String constInfo = (constantValue != null) ? " (const=" + constantValue + ")" : "";
         return String.format(
-                "%-10s | %-6s | %-9s | escopo %-2d | linha %-3d | %s",
+                "%-10s | %-6s | %-9s | escopo %-2d | linha %-3d | %s%s",
                 name,
                 type,
                 category,
                 scopeLevel,
                 line,
-                initialized ? "inicializada" : "não inicializada");
+                initialized ? "inicializada" : "não inicializada",
+                constInfo);
     }
 }

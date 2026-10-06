@@ -104,4 +104,24 @@ public class SymbolTable {
     public List<Symbol> getHistory() {
         return history;
     }
+
+    /* Verifica se um identificador é uma constante conhecida. */
+    public boolean isConstant(String name) {
+        Symbol sym = lookup(name);
+        return sym != null && sym.isConstant();
+    }
+
+    /* Retorna o valor constante de um símbolo, se houver. */
+    public String getConstantValue(String name) {
+        Symbol sym = lookup(name);
+        return (sym != null) ? sym.constantValue : null;
+    }
+
+    /* Define ou atualiza o valor constante de um símbolo. */
+    public void setConstantValue(String name, String value) {
+        Symbol sym = lookup(name);
+        if (sym != null) {
+            sym.constantValue = value;
+        }
+    }
 }

@@ -71,6 +71,12 @@ public class Parser {
         if (match(TokenType.WHILE))
             return parseWhile();
 
+        if (match(TokenType.BREAK))
+            return parseBreak();
+
+        if (match(TokenType.CONTINUE))
+            return parseContinue();
+
         if (check(TokenType.ID))
             return parseAssignment();
 
@@ -208,6 +214,32 @@ public class Parser {
         return new WhileNode(
                 condition,
                 body).at(condition.line);
+    }
+
+    /*
+     * Analisa o comando break.
+     *
+     * Exemplo:
+     *
+     * break;
+     */
+    private Node parseBreak() {
+        Token tok = previous();
+        consume(TokenType.SEMICOLON);
+        return new BreakNode().at(tok.line);
+    }
+
+    /*
+     * Analisa o comando continue.
+     *
+     * Exemplo:
+     *
+     * continue;
+     */
+    private Node parseContinue() {
+        Token tok = previous();
+        consume(TokenType.SEMICOLON);
+        return new ContinueNode().at(tok.line);
     }
 
     /*

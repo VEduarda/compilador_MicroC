@@ -13,6 +13,8 @@ public enum TokenType {
     IF,
     ELSE,
     WHILE,
+    BREAK,
+    CONTINUE,
 
     // Comando de saída
     PRINT,

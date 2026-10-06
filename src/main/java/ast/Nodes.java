@@ -8,6 +8,9 @@ import java.util.List;
  *
  * Cada nó representa uma construção da linguagem:
  * programa, variáveis, expressões, comandos, etc.
+ *
+ * Todos os nós implementam o método accept(ASTVisitor)
+ * para possibilitar o percurso desacoplado da árvore pelo padrão Visitor.
  */
 public class Nodes {
 
@@ -32,6 +35,11 @@ public class Nodes {
                 stmt.print(indent + "  ");
             }
         }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
     }
 
     /*
@@ -49,6 +57,11 @@ public class Nodes {
         @Override
         public void print(String indent) {
             System.out.println(indent + "Number(" + value + ")");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
         }
     }
 
@@ -68,6 +81,11 @@ public class Nodes {
         public void print(String indent) {
             System.out.println(indent + "Identifier(" + name + ")");
         }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
     }
 
     /*
@@ -85,6 +103,11 @@ public class Nodes {
         @Override
         public void print(String indent) {
             System.out.println(indent + "String(" + value + ")");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
         }
     }
 
@@ -116,6 +139,11 @@ public class Nodes {
             left.print(indent + "  ");
             right.print(indent + "  ");
         }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
     }
 
     /*
@@ -140,6 +168,11 @@ public class Nodes {
             System.out.println(indent + "Assignment(" + name + ")");
 
             value.print(indent + "  ");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
         }
     }
 
@@ -176,6 +209,11 @@ public class Nodes {
                 initializer.print(indent + "  ");
             }
         }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
     }
 
     /*
@@ -195,6 +233,11 @@ public class Nodes {
             System.out.println(indent + "Print");
 
             expression.print(indent + "  ");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
         }
     }
 
@@ -217,6 +260,11 @@ public class Nodes {
             for (Node stmt : statements) {
                 stmt.print(indent + "  ");
             }
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
         }
     }
 
@@ -251,6 +299,11 @@ public class Nodes {
                 elseBranch.print(indent + "  ");
             }
         }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
     }
 
     /*
@@ -273,6 +326,49 @@ public class Nodes {
 
             condition.print(indent + "  ");
             body.print(indent + "  ");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
+    }
+
+    /*
+     * Representa um comando break.
+     */
+    public static class BreakNode extends Node {
+
+        public BreakNode() {
+        }
+
+        @Override
+        public void print(String indent) {
+            System.out.println(indent + "Break");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
+    }
+
+    /*
+     * Representa um comando continue.
+     */
+    public static class ContinueNode extends Node {
+
+        public ContinueNode() {
+        }
+
+        @Override
+        public void print(String indent) {
+            System.out.println(indent + "Continue");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
         }
     }
 }

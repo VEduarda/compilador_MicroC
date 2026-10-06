@@ -41,6 +41,7 @@ public class SemanticAnalyzer {
 
     private final SymbolTable symbolTable = new SymbolTable();
     private final List<SemanticError> errors = new ArrayList<>();
+    private int loopDepth = 0;
 
     /* Tipos válidos reconhecidos por este subconjunto do MicroC. */
     private static final String TYPE_INT = "int";
@@ -53,6 +54,8 @@ public class SemanticAnalyzer {
      * é semanticamente válido).
      */
     public List<SemanticError> analyze(ProgramNode program) {
+        errors.clear();
+        loopDepth = 0;
 
         for (Node stmt : program.statements) {
             visitStatement(stmt);
@@ -92,6 +95,12 @@ public class SemanticAnalyzer {
 
         } else if (node instanceof WhileNode w) {
             visitWhile(w);
+
+        } else if (node instanceof BreakNode b) {
+            visitBreak(b);
+
+        } else if (node instanceof ContinueNode c) {
+            visitContinue(c);
 
         } else {
             error(node.line, "R0-ComandoDesconhecido",
@@ -146,6 +155,10 @@ public class SemanticAnalyzer {
                 node.line,
                 initialized);
 
+        if (node.initializer instanceof NumberNode numNode) {
+            symbol.constantValue = numNode.value;
+        }
+
         symbolTable.declare(symbol);
     }
 
@@ -183,6 +196,11 @@ public class SemanticAnalyzer {
         }
 
         symbol.initialized = true;
+        if (node.value instanceof NumberNode numNode) {
+            symbol.constantValue = numNode.value;
+        } else {
+            symbol.constantValue = null;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -233,7 +251,30 @@ public class SemanticAnalyzer {
 
         checkCondition(node.condition);
 
-        visitStatement(node.body);
+        loopDepth++;
+        try {
+            visitStatement(node.body);
+        } finally {
+            loopDepth--;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // break; e continue; (Melhoria 5)
+    // ------------------------------------------------------------------
+
+    private void visitBreak(BreakNode node) {
+        if (loopDepth <= 0) {
+            error(node.line, "R8-BreakForaDeLaco",
+                    "comando 'break' só pode ser usado dentro de um laço de repetição (while)");
+        }
+    }
+
+    private void visitContinue(ContinueNode node) {
+        if (loopDepth <= 0) {
+            error(node.line, "R8-ContinueForaDeLaco",
+                    "comando 'continue' só pode ser usado dentro de um laço de repetição (while)");
+        }
     }
 
     /*

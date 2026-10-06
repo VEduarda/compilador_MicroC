@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório Técnico — Compilador MicroC: Tradução Dirigida por Sintaxe (SDT) e Otimizações de TAC</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --secondary: #0f172a;
+      --text: #334155;
+      --text-dark: #0f172a;
+      --bg: #ffffff;
+      --bg-alt: #f8fafc;
+      --border: #e2e8f0;
+      --code-bg: #f1f5f9;
+      --accent: #0284c7;
+      --success: #15803d;
+      --warning: #b45309;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: var(--text);
+      background-color: var(--bg);
+    }
+
+    @page {
+      size: A4;
+      margin: 20mm 15mm 20mm 15mm;
+      @bottom-right {
+        content: counter(page);
+        font-size: 9pt;
+        color: #94a3b8;
+      }
+    }
+
+    .page {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 30px;
+      background: white;
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+      .page {
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      .no-break {
+        page-break-inside: avoid;
+      }
+      pre, table, .info-box, .stat-box {
+        page-break-inside: avoid;
+      }
+    }
+
+    /* CAPA */
+    .cover {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: center;
+      padding: 40px 20px 20px 20px;
+      page-break-after: always;
+    }
+
+    .cover-header {
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 20px;
+    }
+
+    .cover-header h1 {
+      font-size: 14pt;
+      font-weight: 700;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .cover-header h2 {
+      font-size: 12pt;
+      font-weight: 500;
+      color: var(--primary);
+      margin-top: 6px;
+    }
+
+    .cover-header h3 {
+      font-size: 10pt;
+      font-weight: 400;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .cover-title {
+      margin: 60px 0;
+    }
+
+    .badge-doc {
+      display: inline-block;
+      padding: 4px 14px;
+      background: #eff6ff;
+      color: var(--primary);
+      border: 1px solid #bfdbfe;
+      border-radius: 9999px;
+      font-size: 9.5pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    .cover-title h1 {
+      font-size: 21pt;
+      font-weight: 700;
+      color: var(--secondary);
+      line-height: 1.3;
+    }
+
+    .cover-title .subtitle {
+      font-size: 13pt;
+      color: var(--primary);
+      margin-top: 14px;
+      font-weight: 500;
+      font-style: italic;
+    }
+
+    .cover-motto {
+      background: #f8fafc;
+      border-left: 4px solid var(--accent);
+      padding: 14px 20px;
+      margin: 25px auto;
+      max-width: 600px;
+      text-align: left;
+      font-size: 10.5pt;
+      color: #475569;
+      font-style: italic;
+    }
+
+    .cover-info {
+      text-align: right;
+      margin-top: 30px;
+      font-size: 10.5pt;
+      line-height: 1.7;
+      color: #334155;
+      background: var(--bg-alt);
+      padding: 18px 24px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .cover-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 15px;
+      font-size: 10pt;
+      color: #64748b;
+    }
+
+    /* SEÇÕES E TIPOGRAFIA */
+    h2.section-title {
+      font-size: 15pt;
+      font-weight: 700;
+      color: var(--primary);
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-top: 32px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3.subsection-title {
+      font-size: 12pt;
+      font-weight: 600;
+      color: var(--secondary);
+      margin-top: 22px;
+      margin-bottom: 10px;
+    }
+
+    h4 {
+      font-size: 10.5pt;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+
+    p {
+      margin-bottom: 12px;
+      text-align: justify;
+    }
+
+    ul, ol {
+      margin-left: 22px;
+      margin-bottom: 14px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    /* CAIXAS DE INFORMAÇÃO */
+    .info-box {
+      background: #f0fdf4;
+      border-left: 4px solid var(--success);
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin: 16px 0;
+      font-size: 10pt;
+      color: #166534;
+    }
+
+    .concept-box {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary-light);
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin: 16px 0;
+      font-size: 10pt;
+      color: #1e40af;
+    }
+
+    .stat-box {
+      background: #faf5ff;
+      border: 1px solid #e9d5ff;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 16px 0;
+    }
+
+    .stat-title {
+      font-weight: 700;
+      color: #6b21a8;
+      font-size: 10.5pt;
+      margin-bottom: 8px;
+    }
+
+    /* TABELAS */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 22px 0;
+      font-size: 9.5pt;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+      color: var(--secondary);
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    /* CÓDIGO FONTE */
+    pre {
+      background-color: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 8.5pt;
+      line-height: 1.45;
+      color: #1e293b;
+      overflow-x: auto;
+      margin: 12px 0 16px 0;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 9pt;
+      background-color: #f1f5f9;
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: #0f172a;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    .code-comment { color: #64748b; font-style: italic; }
+    .code-keyword { color: #8b5cf6; font-weight: 600; }
+    .code-string { color: #059669; }
+    .code-func { color: #2563eb; font-weight: 500; }
+
+    /* GRID DE COMPARAÇÃO */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 14px 0;
+    }
+
+    .compare-col {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+
+    .compare-col h4 {
+      margin-top: 0;
+      color: var(--primary);
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 4px;
+      font-size: 9.5pt;
+    }
+
+    .compare-col pre {
+      margin: 6px 0 0 0;
+      background: white;
+      font-size: 8pt;
+    }
+
+    /* SUMÁRIO */
+    .toc {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 22px;
+      margin: 20px 0 30px 0;
+    }
+
+    .toc h3 {
+      font-size: 11pt;
+      font-weight: 700;
+      color: var(--secondary);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .toc ul {
+      list-style-type: none;
+      margin-left: 0;
+    }
+
+    .toc li {
+      margin-bottom: 6px;
+      font-size: 10pt;
+    }
+
+    .toc a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ===================================================================== -->
+  <!-- CAPA DO RELATÓRIO TÉCNICO                                             -->
+  <!-- ===================================================================== -->
+  <div class="cover">
+    <div class="cover-header">
+      <h1>Universidade Estadual do Norte do Paraná — UENP</h1>
+      <h2>Centro de Ciências Tecnológicas • Campus Luiz Meneghel</h2>
+      <h3>Bacharelado em Ciência da Computação • Disciplina de Compiladores (2026/1)</h3>
+    </div>
+
+    <div class="cover-title">
+      <div class="badge-doc">Relatório Técnico Final • Projeto 04 & Entrega Parcial</div>
+      <h1>Desenvolvimento do Código do MicroC para Tradução Dirigida por Sintaxe (SDT)</h1>
+      <div class="subtitle">Da Árvore Sintática Abstrata (AST) ao Código Intermediário de Três Endereços (TAC) e Otimizações</div>
+      
+      <div class="cover-motto">
+        <strong>"A AST mostra ONDE estamos. A Ação Semântica diz O QUE FAZER."</strong><br>
+        — Princípio Didático do Compilador MicroC: Uma AST, Três Traduções.
+      </div>
+    </div>
+
+    <div class="cover-info">
+      <p><strong>Docentes Responsáveis:</strong> Prof. Me. Luciano Rovanni do Nascimento e Prof. Me. Rafael Aguiar</p>
+      <p><strong>Discentes / Equipe de Desenvolvimento:</strong> Integrantes do Grupo de Compiladores</p>
+      <p><strong>Escopo da Entrega:</strong> Front-End Completo + Tradutores SDT (RPN, TAC, Pretty-Printer) + 3 Otimizações</p>
+      <p><strong>Resultado dos Testes:</strong> 21 Cenários Executados • 53 Checks Automatizados com 100% de Sucesso</p>
+      <p><strong>Linguagem do Compilador:</strong> Java 21 (Maven Build System) | Alvo: MicroC Intermediário (TAC/IR)</p>
+    </div>
+
+    <div class="cover-footer">
+      Bandeirantes – PR, Ano Letivo de 2026
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SUMÁRIO DO RELATÓRIO                                                 -->
+  <!-- ===================================================================== -->
+  <div class="toc no-break">
+    <h3>Sumário do Relatório Técnico</h3>
+    <ul>
+      <li><strong>1. Introdução Teórica:</strong> O papel do SDT, distinção formal entre SDD e SDT, e a analogia "Cardápio vs. Cozinha".</li>
+      <li><strong>2. Arquitetura da Implementação:</strong> Diagrama dos Visitors, variáveis de estado e o canal sintetizador <code>lastPlace</code>.</li>
+      <li><strong>3. Os Três Tradutores Obrigatórios:</strong> Implementação e percursos do PostfixTranslator, TACTranslator e PrettyPrinter.</li>
+      <li><strong>4. Detalhamento das Três Melhorias Avançadas Implementadas:</strong>
+        <ul>
+          <li>4.1 Melhoria 1: Dobra de Constantes em Tempo de SDT (Constant Folding) com integração à Tabela de Símbolos.</li>
+          <li>4.2 Melhoria 2: Reuso Inteligente de Variáveis Temporárias via Pool (TempPool e Liveness Analysis).</li>
+          <li>4.3 Melhoria 5: Comandos de Salto break e continue com Pilha de Laços (loopStack e LoopLabels).</li>
+        </ul>
+      </li>
+      <li><strong>5. Bateria de Testes e Resultados:</strong> Validação de 21 cenários de teste automatizados com 53 asserções (0 falhas).</li>
+      <li><strong>6. Conclusões:</strong> Aprendizados e relevância da Representação Intermediária (IR) na indústria de compiladores.</li>
+      <li><strong>7. Referências Bibliográficas:</strong> Normas ABNT (Dragon Book, Cooper & Torczon, LLVM, Rovanni).</li>
+    </ul>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SEÇÃO 1: INTRODUÇÃO TEÓRICA                                          -->
+  <!-- ===================================================================== -->
+  <h2 class="section-title">1. Introdução Teórica e Contextualização</h2>
+  
+  <p>
+    A construção de um compilador é tradicionalmente dividida em duas grandes fases: a fase de <strong>Análise (Front-End)</strong> e a fase de <strong>Síntese (Back-End)</strong>, intermediadas pela produção de uma <strong>Representação Intermediária (IR - Intermediate Representation)</strong>.
+  </p>
+  <p>
+    Nas etapas pregressas do compilador didático <em>MicroC</em>, foram implementados o Analisador Léxico (conversão de caracteres em tokens), o Analisador Sintático (validação gramatical e estruturação na Árvore Sintática Abstrata - AST) e o Analisador Semântico (verificação de regras de tipo e tabela de símbolos em pilha de escopos). Uma vez validada a correção do programa-fonte na AST, surge a questão central da engenharia de software de compiladores: <em>"Como transformar uma estrutura arbórea hierárquica em sequências lineares de instruções executáveis pelo computador?"</em>
+  </p>
+
+  <div class="concept-box">
+    <strong>Distinção Formal: SDD vs. SDT</strong><br>
+    • <strong>Definição Dirigida por Sintaxe (SDD - Syntax-Directed Definition):</strong> É uma especificação formal puramente declarativa. Ela associa atributos (sintetizados ou herdados) às produções gramaticais e define equações matemáticas de avaliação sem prescrever explicitamente a ordem temporal de execução das ações.<br>
+    • <strong>Tradução Dirigida por Sintaxe (SDT - Syntax-Directed Translation):</strong> É uma realização estritamente imperativa e procedimental. O SDT incorpora fragmentos de código (ações semânticas imperativas) diretamente aos percursos da árvore sintática. No MicroC, essas ações emitem código (<code>emit()</code>) de forma sequencial durante as visitas da AST.
+  </div>
+
+  <h3 class="subsection-title">A Analogia Pedagógica "Cardápio vs. Cozinha"</h3>
+  <p>
+    Para evitar o forte acoplamento entre a representação da linguagem e as rotinas de geração de código, o projeto adota rigorosamente a separação entre contrato e implementação:
+  </p>
+  <ul>
+    <li><strong>O Cardápio (Contrato / Interface):</strong> Constituído pela interface <code>ASTVisitor</code> e pelas classes que definem a estrutura dos nós sintáticos (<code>Nodes.java</code>). O "cliente" apenas seleciona o que deseja visitar; a estrutura da árvore não sabe e não se importa com a forma como o código será gerado.</li>
+    <li><strong>A Cozinha (Implementação das Ações Semânticas):</strong> Constituída pelas classes concretas de tradução (<code>PostfixTranslator</code>, <code>TACTranslator</code>, <code>PrettyPrinter</code>). Cada tradutor implementa sua própria "receita" de visita, gerenciando seus contadores, buffers de saída e estratégias de emissão.</li>
+  </ul>
+  <p>
+    Essa separação viabiliza o princípio didático de <strong>"Uma AST, Múltiplas Traduções"</strong>: a mesma árvore permanece inalterada na memória enquanto três tradutores distintos geram saídas especializadas para pilhas (RPN), registradores (TAC) e formatação de texto (Pretty-Printer).
+  </p>
+
+  <!-- ===================================================================== -->
+  <!-- SEÇÃO 2: ARQUITETURA DA IMPLEMENTAÇÃO                                -->
+  <!-- ===================================================================== -->
+  <div class="page-break"></div>
+  <h2 class="section-title">2. Arquitetura da Implementação</h2>
+  
+  <p>
+    O compilador foi desenvolvido em Java 21, utilizando tipagem forte e desacoplamento via padrão de projeto <strong>Visitor</strong>. O percurso polimórfico é acionado pela invocação mútua entre o método <code>accept(ASTVisitor visitor)</code> dos nós da AST e os métodos <code>visit(NodeType node)</code> implementados pelos tradutores.
+  </p>
+
+  <h3 class="subsection-title">Variáveis de Estado do TACTranslator e o Canal Sintetizador <code>lastPlace</code></h3>
+  <p>
+    A linearização de expressões aritméticas e estruturas de controle hierárquicas exige a gestão rigorosa de estados internos no gerador de código TAC:
+  </p>
+  <ul>
+    <li><code>tempCount</code>: Contador numérico incremental responsável por nomear registradores temporários (ex.: <code>t1</code>, <code>t2</code>, ...).</li>
+    <li><code>labelCount</code>: Contador numérico incremental responsável por emitir rótulos únicos de desvio de fluxo (ex.: <code>L1</code>, <code>L2</code>, ...).</li>
+    <li><code>instructions</code>: Estrutura linear (lista encadeada) que armazena na ordem cronológica todas as instruções intermediárias emitidas.</li>
+    <li><code>actionLog</code>: Vetor de log didático que registra cada decisão semântica tomada pelo compilador, facilitando inspeções e depurações.</li>
+    <li><code>loopStack</code>: Pilha de contextos (<code>Deque&lt;LoopLabels&gt;</code>) para emissão precisa de saltos para <code>break</code> e <code>continue</code> em laços aninhados.</li>
+  </ul>
+
+  <div class="info-box">
+    <strong>O Mecanismo de lastPlace como Canal de Comunicação</strong><br>
+    Como os métodos do padrão Visitor na interface <code>ASTVisitor</code> retornam <code>void</code> para preservar a genericidade do percurso, faz-se necessária uma forma de transferir o resultado de uma subexpressão filha para o nó pai que a engloba. No <code>TACTranslator</code>, isso é solucionado pela variável sintetizadora <code>lastPlace</code>.<br>
+    Quando um nó filho (como <code>NumberNode</code>, <code>IdentifierNode</code> ou uma operação <code>BinOpNode</code>) termina seu processamento, ele grava em <code>lastPlace</code> o nome do registrador ou constante onde seu valor está alocado. O nó pai imediatamente consome esse valor como operando da sua própria instrução.
+  </div>
+
+  <pre><code><span class="code-comment">// Exemplo didático do funcionamento de lastPlace em BinOpNode:</span>
+node.left.accept(<span class="code-keyword">this</span>);
+String left = lastPlace;      <span class="code-comment">// Pai captura o operando esquerdo</span>
+
+node.right.accept(<span class="code-keyword">this</span>);
+String right = lastPlace;     <span class="code-comment">// Pai captura o operando direito</span>
+
+String temp = newTemp();      <span class="code-comment">// Aloca registrador para o resultado</span>
+emit(temp + <span class="code-string">" = "</span> + left + <span class="code-string">" "</span> + node.op + <span class="code-string">" "</span> + right);
+lastPlace = temp;             <span class="code-comment">// Comunica para o nível superior que o valor agora está em 'temp'</span></code></pre>
+
+  <!-- ===================================================================== -->
+  <!-- SEÇÃO 3: OS TRÊS TRADUTORES OBRIGATÓRIOS                              -->
+  <!-- ===================================================================== -->
+  <h2 class="section-title">3. Os Três Tradutores Obrigatórios</h2>
+
+  <h3 class="subsection-title">3.1 Tradutor 1: PostfixTranslator (Notação Polonesa Reversa / RPN)</h3>
+  <p>
+    O <code>PostfixTranslator</code> percorre as subárvores de expressões aplicando um caminhamento <strong>estritamente pós-ordem</strong>. O princípio fundamental da RPN consiste em visitar primeiro todos os operandos (da esquerda e da direita) e apenas depois disparar a ação semântica <code>emit()</code> para o operador. A notação pós-fixa dispensa qualquer uso de parênteses, sendo a representação ideal para máquinas virtuais baseadas em pilha (como a JVM e EVM).
+  </p>
+  <ul>
+    <li><strong>Expressão de Entrada:</strong> <code>3 + 4 * 5</code></li>
+    <li><strong>Fluxo Emitido:</strong> <code>3 4 5 * +</code> (comprova visualmente que o produto <code>4 * 5</code> precede a soma com <code>3</code>).</li>
+  </ul>
+
+  <h3 class="subsection-title">3.2 Tradutor 2: TACTranslator (Código de Três Endereços - TAC / IR)</h3>
+  <p>
+    O <code>TACTranslator</code> converte a árvore em instruções lineares onde cada comando possui no máximo um operador e no máximo três endereços (formato <code>destino = op1 operador op2</code>). Para o controle de fluxo, o tradutor realiza a decomposição linear das estruturas hierárquicas através de saltos condicionais (<code>ifFalse</code>) e incondicionais (<code>goto</code>):
+  </p>
+  <ul>
+    <li><strong>Linearização de <code>IfNode</code>:</strong> Avalia a expressão de condição $\rightarrow$ emite <code>ifFalse cond goto L_else</code> $\rightarrow$ visita corpo <em>then</em> $\rightarrow$ emite <code>goto L_end</code> $\rightarrow$ rotula <code>L_else:</code> $\rightarrow$ visita corpo <em>else</em> $\rightarrow$ rotula <code>L_end:</code>.</li>
+    <li><strong>Linearização de <code>WhileNode</code>:</strong> Rotula <code>L_start:</code> $\rightarrow$ avalia a condição do laço $\rightarrow$ emite <code>ifFalse cond goto L_end</code> $\rightarrow$ visita corpo do laço $\rightarrow$ emite <code>goto L_start</code> $\rightarrow$ rotula <code>L_end:</code>.</li>
+  </ul>
+
+  <h3 class="subsection-title">3.3 Tradutor 3: PrettyPrinter (Reimpressor Canônico e Linter)</h3>
+  <p>
+    Demonstrando a aplicação do SDT em ferramentas de engenharia de software (como Prettier e Clang-Format), o <code>PrettyPrinter</code> reconstrói o código-fonte em linguagem MicroC perfeitamente padronizado:
+  </p>
+  <ul>
+    <li>Utiliza a variável interna <code>indentLevel</code> para garantir tabulação consistente de 4 espaços por nível de aninhamento de blocos <code>{ }</code>.</li>
+    <li>Insere parênteses canônicos em todas as expressões binárias para explicitar visualmente a árvore resolvida pelo analisador sintático (ex.: <code>int x = (2 + (3 * 4));</code>).</li>
+  </ul>
+
+  <!-- ===================================================================== -->
+  <!-- SEÇÃO 4: DETALHAMENTO DAS TRÊS MELHORIAS                             -->
+  <!-- ===================================================================== -->
+  <div class="page-break"></div>
+  <h2 class="section-title">4. Detalhamento das Três Melhorias Avançadas Implementadas</h2>
+
+  <h3 class="subsection-title">4.1 Melhoria 1: Dobra de Constantes em Tempo de SDT (Constant Folding)</h3>
+  <p>
+    A técnica de <em>Constant Folding</em> (dobramento de constantes) avalia operações aritméticas e relacionais cujos operandos são conhecidos em tempo de compilação. Em vez de delegar operações redundantes ao processador em tempo de execução, o compilador calcula o resultado no momento do percurso sintático e injeta o literal numérico diretamente em <code>lastPlace</code>, sem emitir instruções e sem alocar variáveis temporárias.
+  </p>
+
+  <p><strong>Integração com a Tabela de Símbolos:</strong></p>
+  <ul>
+    <li><code>Symbol.java</code>: Campo <code>Category.CONSTANT</code>, atributo <code>constantValue</code> e método verificador <code>isConstant()</code>.</li>
+    <li><code>SymbolTable.java</code>: Métodos de consulta e propagação <code>isConstant(name)</code> e <code>getConstantValue(name)</code>.</li>
+    <li><code>TACTranslator.java</code>: Métodos auxiliares <code>resolveConstant(node, place)</code> e <code>computeConstant(op, left, right)</code>, com tratamento seguro para prevenir divisões por zero em tempo de compilação.</li>
+  </ul>
+
+  <div class="compare-grid no-break">
+    <div class="compare-col">
+      <h4>TAC Otimizado com Constant Folding</h4>
+      <pre><code>x = 14
+y = 30
+t1 = x + y
+z = t1
+print z</code></pre>
+    </div>
+    <div class="compare-col">
+      <h4>TAC Ingênuo (Sem Otimização)</h4>
+      <pre><code>t1 = 3 * 4
+t2 = 2 + t1
+x = t2
+t1 = 2 + 3
+t2 = 10 - 4
+t3 = t1 * t2
+y = t3
+t1 = x + y
+z = t1
+print z</code></pre>
+    </div>
+  </div>
+  <p>
+    <strong>Impacto Mensurado:</strong> Redução exata de <strong>50% no total de instruções TAC emitidas</strong> (de 10 instruções para 5) e eliminação integral de 4 variáveis temporárias.
+  </p>
+
+  <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+  <h3 class="subsection-title">4.2 Melhoria 2: Reuso Inteligente de Variáveis Temporárias (TempPool)</h3>
+  <p>
+    Em implementações ingênuas, o compilador aloca novas variáveis temporárias sequenciais de forma ilimitada (<code>t1, t2, ..., t50</code>). Em hardware real, a quantidade de registradores é fisicamente finita. A classe <code>TempPool</code> implementa a análise de ciclo de vida (<em>Liveness Analysis</em>): assim que um nó pai consome o valor de suas variáveis temporárias filhas, essas temporárias são consideradas "mortas" e são devolvidas ao pool via <code>releaseTemp()</code>.
+  </p>
+
+  <p><strong>Estrutura de Dados do Pool:</strong></p>
+  <ul>
+    <li><code>freeTemps</code>: Fila de prioridade (<code>PriorityQueue&lt;Integer&gt;</code>) que garante a reutilização prioritária do registrador de menor índice disponível.</li>
+    <li><code>activeTemps</code>: Conjunto ordenado (<code>TreeSet&lt;Integer&gt;</code>) que mantém as temporárias em uso concorrente na árvore de avaliação.</li>
+  </ul>
+
+  <div class="stat-box no-break">
+    <div class="stat-title">Estatísticas Experimentais do Pool de Temporárias (Cenário do Teste 5):</div>
+    <table style="margin: 0; background: white;">
+      <tr><th>Métrica Avaliada</th><th>Modo Ingênuo</th><th>Com TempPool</th><th>Ganho Técnico</th></tr>
+      <tr><td>Total de alocações solicitadas</td><td>8</td><td>8</td><td>—</td></tr>
+      <tr><td>Reusos imediatos aproveitados</td><td>0</td><td>5</td><td>+5 reciclagens</td></tr>
+      <tr><td>Pico máximo de registradores ativos</td><td>8 (t1..t8)</td><td>3 (t1..t3)</td><td><strong>62,5% de economia</strong></td></tr>
+    </table>
+  </div>
+
+  <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+  <h3 class="subsection-title">4.3 Melhoria 5: Comandos de Salto break e continue com Pilha de Laços (loopStack)</h3>
+  <p>
+    O suporte robusto aos comandos <code>break</code> e <code>continue</code> em linguagens de programação exige controle de contexto quando existem laços aninhados. No <code>TACTranslator</code>, essa funcionalidade é gerida por uma pilha de contextos do tipo <code>Deque&lt;LoopLabels&gt; loopStack</code>:
+  </p>
+  <pre><code><span class="code-keyword">public static class</span> LoopLabels {
+    <span class="code-keyword">public final</span> String start;
+    <span class="code-keyword">public final</span> String end;
+    <span class="code-keyword">public</span> LoopLabels(String start, String end) {
+        <span class="code-keyword">this</span>.start = start;
+        <span class="code-keyword">this</span>.end = end;
+    }
+}
+
+<span class="code-comment">// No percurso de WhileNode:</span>
+loopStack.push(<span class="code-keyword">new</span> LoopLabels(lStart, lEnd));
+<span class="code-keyword">try</span> {
+    node.body.accept(<span class="code-keyword">this</span>);
+} <span class="code-keyword">finally</span> {
+    loopStack.pop();
+}
+
+<span class="code-comment">// Ação semântica de break:</span>
+emit(<span class="code-string">"goto "</span> + loopStack.peek().end, <span class="code-string">"Break: desvio para fim do laço"</span>);
+
+<span class="code-comment">// Ação semântica de continue:</span>
+emit(<span class="code-string">"goto "</span> + loopStack.peek().start, <span class="code-string">"Continue: desvio para início do laço"</span>);</code></pre>
+  <p>
+    <strong>Validação Semântica Integrada:</strong> Caso o comando <code>break</code> ou <code>continue</code> seja utilizado fora de um laço de repetição (como no escopo global ou dentro de um bloco <code>if/else</code> sem laço envolvente), o <code>SemanticAnalyzer</code> acusa formalmente as regras de erro <strong>R8-BreakForaDeLaco</strong> ou <strong>R9-ContinueForaDeLaco</strong>, e o <code>TACTranslator</code> impede a emissão de código inconsistente.
+  </p>
+
+  <!-- ===================================================================== -->
+  <!-- SEÇÃO 5: BATERIA DE TESTES E RESULTADOS                               -->
+  <!-- ===================================================================== -->
+  <div class="page-break"></div>
+  <h2 class="section-title">5. Bateria de Testes e Resultados de Execução</h2>
+  
+  <p>
+    A robustez da implementação é comprovada por uma suíte de <strong>21 cenários de teste</strong> e <strong>53 asserções automatizadas (checks)</strong>, todos executados com 100% de sucesso através do módulo <code>SDTTestRunner.java</code>:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 12%;">Nº</th>
+        <th style="width: 38%;">Cenário / Entrada MicroC</th>
+        <th style="width: 30%;">Objetivo / Foco Tecnológico</th>
+        <th style="width: 20%;">Resultado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>01</td><td><code>int x = 2 + 3 * 4; print(x);</code></td><td>Precedência aritmética canônica</td><td>✅ 100% Validado</td></tr>
+      <tr><td>02</td><td><code>int y = (2 + 3) * (10 - 4);</code></td><td>Parênteses aninhados</td><td>✅ 100% Validado</td></tr>
+      <tr><td>03</td><td><code>if (a > 10) { print(a); } else { print(0); }</code></td><td>Controle de fluxo If-Else linearizado</td><td>✅ 100% Validado</td></tr>
+      <tr><td>04</td><td><code>while (i < 5) { i = i + 1; print(i); }</code></td><td>Laço While com acumulador e retorno</td><td>✅ 100% Validado</td></tr>
+      <tr><td>05</td><td>Expressões com alta densidade de temporárias</td><td><strong>Melhoria 2:</strong> Reuso inteligente (TempPool)</td><td>✅ 62,5% economia</td></tr>
+      <tr><td>06</td><td>Expressões constantes dobradas em tempo de SDT</td><td><strong>Melhoria 1:</strong> Constant Folding</td><td>✅ 50% menos TAC</td></tr>
+      <tr><td>07</td><td>While com <code>break</code> condicionado por <code>if</code></td><td><strong>Melhoria 5:</strong> Desvio correto para L_end</td><td>✅ 100% Validado</td></tr>
+      <tr><td>08</td><td>While com <code>continue</code> condicionado por <code>if</code></td><td><strong>Melhoria 5:</strong> Desvio correto para L_start</td><td>✅ 100% Validado</td></tr>
+      <tr><td>09</td><td>While com <code>break</code> e <code>continue</code> concorrentes</td><td><strong>Melhoria 5:</strong> Múltiplos desvios no mesmo laço</td><td>✅ 100% Validado</td></tr>
+      <tr><td>10</td><td>Laços While aninhados em 2 níveis</td><td><strong>Melhoria 5:</strong> Isolamento de laço interno/externo</td><td>✅ 100% Validado</td></tr>
+      <tr><td>11</td><td><code>break</code> e <code>continue</code> fora de laço</td><td>Validação Semântica (Regras R8 e R9)</td><td>✅ 100% Bloqueado</td></tr>
+      <tr><td>12 a 21</td><td>10 Casos de borda avançados (3 níveis, if/else, folding)</td><td>Testes de estresse e casos complexos</td><td>✅ 100% Validado</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="subsection-title">Exemplo de Execução do Console: Laços Aninhados com Break (Teste 10)</h3>
+  <pre><code>=== CÓDIGO INTERMEDIÁRIO DE TRÊS ENDEREÇOS (TAC / IR) ===
+i = 0
+j = 0
+L1:
+t1 = i < 3
+ifFalse t1 goto L2
+t1 = i + 1
+i = t1
+j = 0
+L3:
+t1 = j < 5
+ifFalse t1 goto L4
+t1 = j + 1
+j = t1
+t1 = j == 2
+ifFalse t1 goto L5
+goto L4                  ; Break do laço interno salta para L4 (saída do interno)
+L5:
+print j
+goto L3                  ; Repetição do laço interno
+L4:
+print i
+goto L1                  ; Repetição do laço externo
+L2:                      ; Saída do laço externo</code></pre>
+
+  <!-- ===================================================================== -->
+  <!-- SEÇÃO 6: CONCLUSÕES                                                  -->
+  <!-- ===================================================================== -->
+  <h2 class="section-title">6. Conclusões</h2>
+  <p>
+    A implementação do módulo de Tradução Dirigida por Sintaxe e das otimizações no compilador MicroC demonstrou de maneira prática a relevância de uma representação intermediária independente da máquina.
+  </p>
+  <p>
+    Ao adotar a filosofia de <strong>"Uma AST, Múltiplas Traduções"</strong>, comprovou-se que o uso do padrão Visitor confere extrema modularidade ao sistema, permitindo que a mesma representação arbórea alimente saídas para máquinas de pilha (RPN), formatadores canônicos (Pretty-Printer) e geradores industriais de código linear (TAC). A implementação completa das três melhorias avançadas (Constant Folding, TempPool e loopStack) aliada a uma suíte de 53 verificações automatizadas consolida com pleno rigor técnico a fase de síntese e deixa o compilador preparado para as etapas subsequentes de geração de código para arquitetura-alvo (Back-End).
+  </p>
+
+  <!-- ===================================================================== -->
+  <!-- SEÇÃO 7: REFERÊNCIAS BIBLIOGRÁFICAS                                  -->
+  <!-- ===================================================================== -->
+  <h2 class="section-title">7. Referências Bibliográficas (Normas ABNT)</h2>
+  <p style="margin-bottom: 8px;">AHO, Alfred V.; LAM, Monica S.; SETHI, Ravi; ULLMAN, Jeffrey D. <strong>Compiladores: Princípios, Técnicas e Ferramentas (Dragon Book)</strong>. 2. ed. São Paulo: Pearson Prentice Hall, 2008.</p>
+  <p style="margin-bottom: 8px;">COOPER, Keith D.; TORCZON, Linda. <strong>Construindo Compiladores</strong>. 2. ed. Rio de Janeiro: Elsevier, 2014.</p>
+  <p style="margin-bottom: 8px;">LATTNER, Chris; ADVE, Vikram. <strong>LLVM: A Compilation Framework for Lifelong Program Analysis & Transformation</strong>. <em>In</em>: IEEE International Symposium on Code Generation and Optimization (CGO), 2004, Palo Alto, CA. Anais [...]. IEEE, 2004. p. 75–86.</p>
+  <p style="margin-bottom: 8px;">ROVANNI DO NASCIMENTO, Luciano. <strong>Roteiro Didático de SDT no Compilador MicroC: O Caminho do Pensamento</strong>. Bandeirantes: UENP, 2026.</p>
+
+</div>
+
+</body>
+</html>

@@ -37,4 +37,10 @@ public abstract class Node {
     public void print() {
         print("");
     }
+
+    /**
+     * Padrão Visitor: aceita um visitante da AST para percurso e tradução desacoplada.
+     * @param visitor visitante que implementa a interface ASTVisitor
+     */
+    public abstract void accept(ASTVisitor visitor);
 }
