@@ -92,31 +92,6 @@ public class PostfixTranslator implements ASTVisitor {
     // =========================================================================
 
     @Override
-    public void visit(BinOpNode node) {
-        // 1. Visita operando esquerdo
-        node.left.accept(this);
-        // 2. Visita operando direito
-        node.right.accept(this);
-        // 3. Emite o operador após ambos os operandos (pós-ordem estrita)
-        emit(node.op);
-    }
-
-    @Override
-    public void visit(NumberNode node) {
-        emit(node.value);
-    }
-
-    @Override
-    public void visit(IdentifierNode node) {
-        emit(node.name);
-    }
-
-    @Override
-    public void visit(StringNode node) {
-        emit("\"" + node.value + "\"");
-    }
-
-    @Override
     public void visit(ProgramNode node) {
         actionLog.add("[PostfixTranslator] Processando programa com " + node.statements.size() + " comandos");
         for (Node stmt : node.statements) {
@@ -187,6 +162,55 @@ public class PostfixTranslator implements ASTVisitor {
     public void visit(BlockNode node) {
         for (Node stmt : node.statements) {
             stmt.accept(this);
+        }
+    }
+
+    @Override
+    public void visit(BinOpNode node) {
+        // 1. Visita operando esquerdo
+        node.left.accept(this);
+        // 2. Visita operando direito
+        node.right.accept(this);
+        // 3. Emite o operador após ambos os operandos (pós-ordem estrita)
+        emit(node.op);
+    }
+
+    @Override
+    public void visit(UnaryOpNode node) {
+        if (node.expr != null) {
+            node.expr.accept(this);
+        }
+        emit(node.op);
+    }
+
+    @Override
+    public void visit(NumberNode node) {
+        emit(node.value);
+    }
+
+    @Override
+    public void visit(IdentifierNode node) {
+        emit(node.name);
+    }
+
+    @Override
+    public void visit(StringNode node) {
+        emit("\"" + node.value + "\"");
+    }
+
+    @Override
+    public void visit(ReturnNode node) {
+        if (node.value != null) {
+            int startIdx = tokens.size();
+            node.value.accept(this);
+            captureExpression(startIdx, "Expressão do return");
+        }
+    }
+
+    @Override
+    public void visit(FunctionNode node) {
+        if (node.body != null) {
+            node.body.accept(this);
         }
     }
 

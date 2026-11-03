@@ -38,6 +38,12 @@ public interface ASTVisitor {
 
     void visit(StringNode node);
 
+    default void visit(UnaryOpNode node) {}
+
+    default void visit(ReturnNode node) {}
+
+    default void visit(FunctionNode node) {}
+
     /**
      * Ponto de entrada utilitário para despacho polimórfico a partir de nó genérico.
      */

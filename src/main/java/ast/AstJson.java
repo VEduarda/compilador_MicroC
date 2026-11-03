@@ -237,10 +237,14 @@ public class AstJson {
 
             return """
                     {
-                      "Number": "%s"
+                      "Number": {
+                        "value": "%s",
+                        "type": "%s"
+                      }
                     }
                     """.formatted(
-                    n.value);
+                    n.value,
+                    n.type);
         }
 
         // =====================================================
@@ -269,6 +273,40 @@ public class AstJson {
                     }
                     """.formatted(
                     i.name);
+        }
+
+        if (node instanceof ReturnNode r) {
+            String val = r.value == null ? "null" : toJson(r.value);
+            return """
+                    {
+                      "Return": {
+                        "value": %s
+                      }
+                    }
+                    """.formatted(val);
+        }
+
+        if (node instanceof FunctionNode f) {
+            return """
+                    {
+                      "Function": {
+                        "returnType": "%s",
+                        "name": "%s",
+                        "body": %s
+                      }
+                    }
+                    """.formatted(f.returnType, f.name, toJson(f.body));
+        }
+
+        if (node instanceof UnaryOpNode u) {
+            return """
+                    {
+                      "UnaryOp": {
+                        "op": "%s",
+                        "expr": %s
+                      }
+                    }
+                    """.formatted(u.op, toJson(u.expr));
         }
 
         return "{}";

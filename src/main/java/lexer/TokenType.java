@@ -6,8 +6,10 @@ package lexer;
  */
 public enum TokenType {
 
-    // Palavra reservada para declaração de inteiro
+    // Palavras reservadas para tipos
     INT,
+    FLOAT,
+    VOID,
 
     // Estruturas de controle
     IF,
@@ -15,11 +17,12 @@ public enum TokenType {
     WHILE,
     BREAK,
     CONTINUE,
+    RETURN,
 
     // Comando de saída
     PRINT,
 
-    // Identificadores (nomes de variáveis)
+    // Identificadores (nomes de variáveis e funções)
     ID,
 
     // Números literais
@@ -31,14 +34,14 @@ public enum TokenType {
     // Operador de atribuição (=)
     ASSIGN,
     
-    // Operadores relacionais
+    // Operadores relacionais e igualdade
     EQUAL,       // ==
     NOT_EQUAL,   // !=
     
-    // Operadores relacionais
-    AND,
-    OR,
-    NOT,
+    // Operadores lógicos
+    AND,         // &&
+    OR,          // ||
+    NOT,         // !
     
     // Operadores aritméticos
     PLUS,        // +
@@ -60,8 +63,9 @@ public enum TokenType {
     LBRACE,
     RBRACE,
 
-    // Final de comando
-    SEMICOLON,
+    // Delimitadores
+    COMMA,       // ,
+    SEMICOLON,   // ;
 
     // Final do arquivo
     EOF

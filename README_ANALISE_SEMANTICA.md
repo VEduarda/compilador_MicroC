@@ -1,115 +1,69 @@
-# Analisador Semântico do MicroC — o que foi adicionado
+# Análise semântica do MicroC
 
-Este documento explica **apenas a parte nova** (análise semântica), construída em
-cima do analisador léxico e sintático que vocês já tinham prontos. Nenhum arquivo
-de `lexer` ou `parser` foi reescrito — só recebeu pequenos ajustes pontuais
-(explicados na seção 3).
+Este arquivo documenta a etapa semântica existente no projeto. A visão de
+arquitetura, o fluxo completo e o estado das funcionalidades estão em
+[DOCUMENTACAO_COMPILADOR_MICROC.md](./DOCUMENTACAO_COMPILADOR_MICROC.md).
 
-## 1. Arquivos novos (pacote `semantic`)
+## Arquivos
 
-```
+```text
 src/main/java/semantic/
-├── Symbol.java            -> uma linha da Tabela de Símbolos
-├── SymbolTable.java        -> a Tabela de Símbolos em si (pilha de escopos)
-├── SemanticError.java      -> um erro semântico (linha + regra + mensagem)
-└── SemanticAnalyzer.java   -> percorre a AST e aplica as regras semânticas
+├── Symbol.java
+├── SymbolTable.java
+├── SemanticError.java
+└── SemanticAnalyzer.java
 ```
 
-### Symbol
-Guarda `name`, `type`, `category` (VARIABLE/PARAMETER/FUNCTION — os dois
-últimos já deixados prontos para quando o grupo quiser estender a linguagem
-com funções), `scopeLevel`, `line` e se já foi `initialized`.
+- `Symbol` guarda nome, tipo textual, categoria, escopo, linha, estado de
+  inicialização e, quando conhecido, um valor constante.
+- `SymbolTable` mantém uma pilha de mapas para os escopos ativos e um histórico
+  dos símbolos declarados. A busca começa no escopo mais interno, permitindo
+  shadowing durante a análise.
+- `SemanticError` registra linha, identificador da regra e mensagem.
+- `SemanticAnalyzer` percorre a AST e infere os tipos das expressões.
 
-### SymbolTable
-Implementada como **pilha de escopos** (`Deque<Map<String,Symbol>>`).
-- `enterScope()` / `exitScope()` — abrem/fecham um escopo a cada `{ }`.
-- `declare(symbol)` — insere no escopo atual; retorna `false` se já existir
-  o mesmo nome **nesse mesmo escopo** (redeclaração).
-- `lookup(name)` — procura do escopo mais interno para o mais externo (é
-  isso que faz o sombreamento/shadowing funcionar automaticamente).
-- Mantém também um **histórico** de todos os símbolos já declarados, para
-  imprimir a Tabela de Símbolos completa ao final, mesmo depois que os
-  escopos internos já foram fechados.
+## Verificações implementadas
 
-### SemanticAnalyzer
-Percorre a AST (mesmo padrão de `Node.print()`/`AstJson`, usando
-`instanceof`) e aplica as regras semânticas descritas na próxima seção.
+| Regra | Verificação |
+|---|---|
+| R1 | Uso de identificador não declarado |
+| R2 | Redeclaração no mesmo escopo |
+| R3 | Compatibilidade entre tipo declarado e inicializador/atribuição |
+| R4 | Compatibilidade de operandos e operadores de expressões |
+| R5 | Shadowing em escopo interno permitido |
+| R6 | Condição de `if`/`while` não pode ser uma string |
+| R7 | Uso de variável antes de inicialização |
+| R8 | `break` e `continue` precisam estar dentro de `while` |
 
-## 2. Regras semânticas implementadas
+O analisador trata `int` e `float` como tipos numéricos, e `string` como tipo
+derivado de literais de texto. Literais decimais usam o formato `dígitos.dígitos`.
+Em operações aritméticas, misturar `int` e `float` promove o resultado para
+`float`; comparações e operações lógicas retornam `int`. Atribuir `int` a `float`
+é permitido por conversão implícita, mas atribuir `float` a `int` gera erro para
+evitar perda silenciosa de precisão. Operações binárias com strings são rejeitadas.
 
-| Regra | Descrição | Exemplo que dispara o erro |
-|---|---|---|
-| R1 | Variável usada sem ter sido declarada | `z = 5;` sem `int z;` antes |
-| R2 | Redeclaração no **mesmo** escopo | `int x; int x;` no mesmo bloco |
-| R3 | Tipo incompatível em declaração/atribuição | `int y = "texto";` |
-| R4 | Operandos incompatíveis em expressão binária | `"abc" + 1` |
-| R5 | Sombreamento (shadowing) em escopo mais interno | **permitido**, não gera erro |
-| R6 | Condição de `if`/`while` não pode ser `string` | `if ("erro") { }` |
-| R7 (extra) | Uso de variável antes de receber valor | `int x; print(x);` |
+Depois de analisar o programa, `SemanticAnalyzer.getExpressionType(node)` permite
+consultar o tipo inferido de uma expressão, por exemplo, `float` para `a + b`
+quando `a` é `int` e `b` é `float`. A consulta retorna `"erro"` se encontrar
+inconsistência semântica.
 
-Essas regras cobrem diretamente os Exercícios **1, 2, 3, 4, 6, 7 e 9** do PDF.
+## Funções: suporte parcial
 
-## 3. Pequenos ajustes no código existente (não muda a linguagem)
+A AST, o parser e o analisador semântico reconhecem definições de função com
+parâmetros `int` ou `float` e registram a função e os parâmetros na tabela de símbolos.
+Isso não equivale a suporte completo a funções: o parser não reconhece chamadas,
+e a análise semântica não valida aridade, tipos dos argumentos ou compatibilidade
+do `return` com o tipo de retorno declarado. Veja as limitações detalhadas na
+[documentação geral](./DOCUMENTACAO_COMPILADOR_MICROC.md).
 
-O único problema é que os nós da AST não guardavam a **linha** do código-fonte,
-e o PDF pede que todo erro semântico aponte a linha. Então:
+## Escopos e regras
 
-- `ast/Node.java`: ganhou um campo `public int line` e um método fluente
-  `.at(line)`.
-- `parser/Parser.java`: cada `new XyzNode(...)` passou a terminar com
-  `.at(token.line)`. Nenhuma regra gramatical mudou — é só "carimbar" a
-  linha no nó que já era criado.
-- `main/Main.java`: depois de montar a AST, agora chama o
-  `SemanticAnalyzer`, imprime a Tabela de Símbolos e a lista de erros
-  semânticos, e força a saída do console em UTF-8 (para os acentos não
-  quebrarem em qualquer terminal).
+O escopo global é criado pela tabela de símbolos. Blocos de `if` e `while`
+abrem escopos; o corpo de função recebe um escopo para seus parâmetros e
+variáveis. A tabela mantém o histórico para permitir a exibição das entradas
+mesmo depois do fechamento do escopo.
 
-## 4. ⚠️ Limitação importante: funções, `float` e `const`
-
-O PDF de exercícios (Ex. 1, 3, 5, 8, 10) usa `float`, `const` e **funções com
-parâmetros e retorno**. A gramática atual do MicroC (`lexer`/`parser`) ainda
-**não reconhece** esses recursos — só existe `int`, `if/else`, `while`,
-`print`, declaração e atribuição.
-
-Por isso o `SemanticAnalyzer` foi construído para o que a linguagem já
-suporta hoje, e cobre integralmente os exercícios 2, 4, 6, 7 e 9. Os
-exercícios que envolvem função/float/const podem ser resolvidos **no papel**
-usando a mesma lógica implementada aqui (a Tabela de Símbolos e as regras
-R1–R4 são exatamente as mesmas que se aplicariam a funções e parâmetros).
-
-Se o grupo quiser que o analisador rode esses exercícios de verdade, o
-próximo passo é estender `TokenType`/`Lexer`/`Parser`/`Nodes` com:
-- token e palavra reservada `float`, `const`, `void`, `return`, `,`
-- `FunctionNode` (nome, tipo de retorno, lista de parâmetros, corpo)
-- `CallNode` (nome da função, lista de argumentos)
-- `ReturnNode`
-
-e depois adicionar em `SemanticAnalyzer`:
-- checagem de aridade e tipo dos argumentos numa chamada (Exercício 5)
-- checagem de que o `return` é compatível com o tipo de retorno da função
-- registro de `const` como símbolo "não reatribuível" (erro se houver
-  atribuição posterior)
-
-Posso te ajudar a fazer essa extensão também — é só pedir.
-
-## 5. Como rodar
-
-```bash
-mvn compile exec:java -Dexec.mainClass=main.Main
-```
-
-ou, sem Maven:
-
-```bash
-javac -d out $(find src/main/java -name "*.java")
-java -cp out main.Main
-```
-
-A saída mostra, nesta ordem: tokens, AST (texto e JSON), **Tabela de
-Símbolos**, **lista de erros semânticos** e estatísticas de tempo de cada
-fase (léxica, sintática e agora também semântica).
-
-O `Main.java` já vem com um programa de exemplo que dispara de propósito
-três erros (redeclaração, tipo incompatível e variável não declarada) e
-mostra um caso de sombreamento válido, para vocês apresentarem o
-funcionamento na entrega do trabalho.
+O reconhecimento semântico de shadowing não garante que o back-end preserve
+esse comportamento na execução: o TAC usa os nomes das variáveis diretamente,
+e o interpretador mantém uma única memória plana. Essa diferença está registrada
+como limitação do back-end na documentação geral.

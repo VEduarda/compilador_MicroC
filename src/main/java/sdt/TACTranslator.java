@@ -76,6 +76,9 @@ public class TACTranslator implements ASTVisitor {
     /** Mapa local de constantes conhecidas rastreadas durante a geração. */
     private final Map<String, Integer> knownConstants = new HashMap<>();
 
+    /** Tipos declarados por escopo para emitir conversões int -> float no TAC. */
+    private final Deque<Map<String, String>> typeScopes = new ArrayDeque<>();
+
     /**
      * Par de rótulos (L_start, L_end) do laço de repetição atual para desvios de break e continue (Melhoria 5).
      */
@@ -205,6 +208,8 @@ public class TACTranslator implements ASTVisitor {
         labelCount = 0;
         lastPlace = "";
         knownConstants.clear();
+        typeScopes.clear();
+        typeScopes.push(new HashMap<>());
 
         if (usePool) {
             tempPool.reset();
@@ -259,6 +264,9 @@ public class TACTranslator implements ASTVisitor {
         if (node.initializer != null) {
             node.initializer.accept(this);
             String val = lastPlace;
+            if ("float".equals(node.type)) {
+                val = convertToFloat(val);
+            }
             emit(node.name + " = " + val, "VarDecl: inicialização de '" + node.name + "'");
             releaseTemp(val);
             recordKnownConstant(node.name, val);
@@ -266,6 +274,7 @@ public class TACTranslator implements ASTVisitor {
             actionLog.add("[DeclarationNode] Variável '" + node.name + "' sem valor inicial");
             knownConstants.remove(node.name);
         }
+        typeScopes.peek().put(node.name, node.type);
     }
 
     @Override
@@ -274,6 +283,9 @@ public class TACTranslator implements ASTVisitor {
         actionLog.add("[visit AssignmentNode] Atribuição para variável '" + node.name + "'");
         node.value.accept(this);
         String val = lastPlace;
+        if ("float".equals(lookupType(node.name))) {
+            val = convertToFloat(val);
+        }
         emit(node.name + " = " + val, "Assign: atribuição a '" + node.name + "'");
         releaseTemp(val);
         recordKnownConstant(node.name, val);
@@ -446,10 +458,79 @@ public class TACTranslator implements ASTVisitor {
     @Override
     public void visit(BlockNode node) {
         actionLog.add("[visit BlockNode] Início de bloco com " + node.statements.size() + " comandos");
+        typeScopes.push(new HashMap<>());
         for (Node stmt : node.statements) {
             stmt.accept(this);
         }
+        typeScopes.pop();
         actionLog.add("[visit BlockNode] Fim de bloco");
+    }
+
+    @Override
+    public void visit(UnaryOpNode node) {
+        actionLog.add("[visit UnaryOpNode] Operação unária '" + node.op + "'");
+        node.expr.accept(this);
+        String operand = lastPlace;
+
+        if (constantFolding) {
+            Integer c = resolveConstant(node.expr, operand);
+            if (c != null) {
+                int res = node.op.equals("!") ? (c == 0 ? 1 : 0) : -c;
+                lastPlace = String.valueOf(res);
+                actionLog.add("[visit UnaryOpNode] Constant Folding aplicado: " + node.op + operand + " -> " + lastPlace);
+                return;
+            }
+        }
+
+        String temp = newTemp();
+        emit(temp + " = " + node.op + " " + operand, "UnaryOp: '" + node.op + "'");
+        releaseTemp(operand);
+        lastPlace = temp;
+    }
+
+    @Override
+    public void visit(ReturnNode node) {
+        actionLog.add("[visit ReturnNode] Comando return");
+        if (node.value != null) {
+            node.value.accept(this);
+            String val = lastPlace;
+            emit("return " + val, "Return com valor");
+            releaseTemp(val);
+        } else {
+            emit("return", "Return sem valor");
+        }
+    }
+
+    @Override
+    public void visit(FunctionNode node) {
+        actionLog.add("[visit FunctionNode] Início da função '" + node.name + "'");
+        emit(node.name + ":", "Rótulo da função '" + node.name + "'");
+        typeScopes.push(new HashMap<>());
+        if (node.parameters != null) {
+            for (DeclarationNode parameter : node.parameters) {
+                typeScopes.peek().put(parameter.name, parameter.type);
+            }
+        }
+        if (node.body != null) {
+            node.body.accept(this);
+        }
+        typeScopes.pop();
+        actionLog.add("[visit FunctionNode] Fim da função '" + node.name + "'");
+    }
+
+    private String convertToFloat(String value) {
+        String temp = newTemp();
+        emit(temp + " = float " + value, "Conversão implícita de int para float");
+        releaseTemp(value);
+        return temp;
+    }
+
+    private String lookupType(String name) {
+        for (Map<String, String> scope : typeScopes) {
+            String type = scope.get(name);
+            if (type != null) return type;
+        }
+        return null;
     }
 
     // =========================================================================
@@ -622,6 +703,8 @@ public class TACTranslator implements ASTVisitor {
             case ">=" -> (left >= right) ? 1 : 0;
             case "==" -> (left == right) ? 1 : 0;
             case "!=" -> (left != right) ? 1 : 0;
+            case "&&" -> ((left != 0) && (right != 0)) ? 1 : 0;
+            case "||" -> ((left != 0) || (right != 0)) ? 1 : 0;
             default -> null;
         };
     }

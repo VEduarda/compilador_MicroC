@@ -43,15 +43,20 @@ public class Nodes {
     }
 
     /*
-     * Representa um número literal.
-     * Exemplo: 10, 25, 100
+     * Representa um literal numérico inteiro ou decimal.
      */
     public static class NumberNode extends Node {
 
         public final String value;
+        public final String type;
 
         public NumberNode(String value) {
+            this(value, value.contains(".") ? "float" : "int");
+        }
+
+        public NumberNode(String value, String type) {
             this.value = value;
+            this.type = type;
         }
 
         @Override
@@ -364,6 +369,91 @@ public class Nodes {
         @Override
         public void print(String indent) {
             System.out.println(indent + "Continue");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
+    }
+
+    /*
+     * Representa uma operação unária (! ou - unário).
+     */
+    public static class UnaryOpNode extends Node {
+
+        public final String op;
+        public final Node expr;
+
+        public UnaryOpNode(String op, Node expr) {
+            this.op = op;
+            this.expr = expr;
+        }
+
+        @Override
+        public void print(String indent) {
+            System.out.println(indent + "UnaryOp(" + op + ")");
+            expr.print(indent + "  ");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
+    }
+
+    /*
+     * Representa um comando return.
+     */
+    public static class ReturnNode extends Node {
+
+        public final Node value; // pode ser null se return sem valor
+
+        public ReturnNode(Node value) {
+            this.value = value;
+        }
+
+        @Override
+        public void print(String indent) {
+            System.out.println(indent + "Return");
+            if (value != null) {
+                value.print(indent + "  ");
+            }
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
+    }
+
+    /*
+     * Representa uma declaração de função (ex: int main() { ... }).
+     */
+    public static class FunctionNode extends Node {
+
+        public final String returnType;
+        public final String name;
+        public final List<DeclarationNode> parameters;
+        public final BlockNode body;
+
+        public FunctionNode(String returnType, String name, List<DeclarationNode> parameters, BlockNode body) {
+            this.returnType = returnType;
+            this.name = name;
+            this.parameters = parameters;
+            this.body = body;
+        }
+
+        @Override
+        public void print(String indent) {
+            System.out.println(indent + "Function(" + returnType + " " + name + ")");
+            if (parameters != null && !parameters.isEmpty()) {
+                System.out.println(indent + "  Params:");
+                for (DeclarationNode p : parameters) {
+                    p.print(indent + "    ");
+                }
+            }
+            body.print(indent + "  ");
         }
 
         @Override

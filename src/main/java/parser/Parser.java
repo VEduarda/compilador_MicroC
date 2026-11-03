@@ -59,8 +59,8 @@ public class Parser {
      */
     private Node parseStatement() {
 
-        if (match(TokenType.INT))
-            return parseDeclaration();
+        if (match(TokenType.INT, TokenType.FLOAT, TokenType.VOID))
+            return parseDeclarationOrFunction();
 
         if (match(TokenType.PRINT))
             return parsePrint();
@@ -77,6 +77,9 @@ public class Parser {
         if (match(TokenType.CONTINUE))
             return parseContinue();
 
+        if (match(TokenType.RETURN))
+            return parseReturn();
+
         if (check(TokenType.ID))
             return parseAssignment();
 
@@ -85,33 +88,65 @@ public class Parser {
     }
 
     /*
-     * Analisa uma declaração de variável.
+     * Analisa uma declaração de variável ou definição de função.
      *
      * Exemplos:
-     *
      * int x;
      * int x = 10;
+     * int main() { ... }
+     * int soma(int a, int b) { ... }
      */
-    private Node parseDeclaration() {
+    private Node parseDeclarationOrFunction() {
+        Token typeTok = previous();
+        Token id = consume(TokenType.ID);
 
-        Token id =
-                consume(TokenType.ID);
+        // Verifica se é uma definição de função (ex.: int main() { ... })
+        if (match(TokenType.LPAREN)) {
+            List<DeclarationNode> params = new ArrayList<>();
+            if (!check(TokenType.RPAREN)) {
+                do {
+                    Token paramType = consume(TokenType.INT, TokenType.FLOAT);
+                    Token paramId = consume(TokenType.ID);
+                    DeclarationNode decl = new DeclarationNode(paramType.lexeme, paramId.lexeme, null);
+                    decl.at(paramId.line);
+                    params.add(decl);
+                } while (match(TokenType.COMMA));
+            }
+            consume(TokenType.RPAREN);
+            BlockNode body = parseBlock();
+            return new FunctionNode(typeTok.lexeme, id.lexeme, params, body).at(id.line);
+        }
 
+        // Caso contrário, é uma declaração de variável
         Node initializer = null;
-
-        // Verifica se existe um valor inicial
         if (match(TokenType.ASSIGN)) {
-
-            initializer =
-                    parseExpression();
+            initializer = parseExpression();
         }
 
         consume(TokenType.SEMICOLON);
 
         return new DeclarationNode(
-                "int",
+                typeTok.lexeme,
                 id.lexeme,
                 initializer).at(id.line);
+    }
+
+    /*
+     * Analisa o comando return.
+     *
+     * Exemplos:
+     * return;
+     * return a;
+     * return a + 10;
+     */
+    private Node parseReturn() {
+        Token retTok = previous();
+        Node value = null;
+        if (!check(TokenType.SEMICOLON)) {
+            value = parseExpression();
+        }
+        consume(TokenType.SEMICOLON);
+        return new ReturnNode(value).at(retTok.line);
     }
 
     /*
@@ -279,64 +314,88 @@ public class Parser {
      * x > 5
      * y == 20
      */
+    /*
+     * Analisa expressões com hierarquia completa de precedência:
+     *   1. Lógica OR (||)
+     *   2. Lógica AND (&&)
+     *   3. Igualdade (==, !=)
+     *   4. Relacional (<, >, <=, >=)
+     *   5. Aditiva (+, -)
+     *   6. Multiplicativa (*, /)
+     *   7. Unária (!, -)
+     *   8. Fator / Primário (número, string, id, parênteses)
+     */
     private Node parseExpression() {
+        return parseLogicalOr();
+    }
 
-        Node expr =
-                parseTerm();
-
-        while (match(
-                TokenType.PLUS,
-                TokenType.MINUS,
-                TokenType.LT,
-                TokenType.GT,
-                TokenType.LTE,
-                TokenType.GTE,
-                TokenType.EQUAL,
-                TokenType.NOT_EQUAL)) {
-
-            Token op =
-                    previous();
-
-            Node right =
-                    parseTerm();
-
-            expr = new BinOpNode(
-                    expr,
-                    op.lexeme,
-                    right).at(op.line);
+    private Node parseLogicalOr() {
+        Node expr = parseLogicalAnd();
+        while (match(TokenType.OR)) {
+            Token op = previous();
+            Node right = parseLogicalAnd();
+            expr = new BinOpNode(expr, op.lexeme, right).at(op.line);
         }
-
         return expr;
     }
 
-    /*
-     * Analisa operações de multiplicação e divisão.
-     *
-     * Essas operações possuem prioridade maior
-     * dentro das expressões.
-     */
-    private Node parseTerm() {
-
-        Node expr =
-                parseFactor();
-
-        while (match(
-                TokenType.MULT,
-                TokenType.DIV)) {
-
-            Token op =
-                    previous();
-
-            Node right =
-                    parseFactor();
-
-            expr = new BinOpNode(
-                    expr,
-                    op.lexeme,
-                    right).at(op.line);
+    private Node parseLogicalAnd() {
+        Node expr = parseEquality();
+        while (match(TokenType.AND)) {
+            Token op = previous();
+            Node right = parseEquality();
+            expr = new BinOpNode(expr, op.lexeme, right).at(op.line);
         }
-
         return expr;
+    }
+
+    private Node parseEquality() {
+        Node expr = parseRelational();
+        while (match(TokenType.EQUAL, TokenType.NOT_EQUAL)) {
+            Token op = previous();
+            Node right = parseRelational();
+            expr = new BinOpNode(expr, op.lexeme, right).at(op.line);
+        }
+        return expr;
+    }
+
+    private Node parseRelational() {
+        Node expr = parseAdditive();
+        while (match(TokenType.LT, TokenType.GT, TokenType.LTE, TokenType.GTE)) {
+            Token op = previous();
+            Node right = parseAdditive();
+            expr = new BinOpNode(expr, op.lexeme, right).at(op.line);
+        }
+        return expr;
+    }
+
+    private Node parseAdditive() {
+        Node expr = parseMultiplicative();
+        while (match(TokenType.PLUS, TokenType.MINUS)) {
+            Token op = previous();
+            Node right = parseMultiplicative();
+            expr = new BinOpNode(expr, op.lexeme, right).at(op.line);
+        }
+        return expr;
+    }
+
+    private Node parseMultiplicative() {
+        Node expr = parseUnary();
+        while (match(TokenType.MULT, TokenType.DIV)) {
+            Token op = previous();
+            Node right = parseUnary();
+            expr = new BinOpNode(expr, op.lexeme, right).at(op.line);
+        }
+        return expr;
+    }
+
+    private Node parseUnary() {
+        if (match(TokenType.NOT, TokenType.MINUS)) {
+            Token op = previous();
+            Node right = parseUnary();
+            return new UnaryOpNode(op.lexeme, right).at(op.line);
+        }
+        return parseFactor();
     }
 
     /*
@@ -350,9 +409,12 @@ public class Parser {
      */
     private Node parseFactor() {
 
-        if (match(TokenType.NUMBER))
-            return new NumberNode(
-                    previous().lexeme).at(previous().line);
+        if (match(TokenType.NUMBER)) {
+            Token number = previous();
+            // O lexema decimal carrega o tipo até a AST; o semântico usa esse dado na promoção.
+            String type = number.lexeme.contains(".") ? "float" : "int";
+            return new NumberNode(number.lexeme, type).at(number.line);
+        }
 
         if (match(TokenType.STRING))
             return new StringNode(
@@ -410,6 +472,16 @@ public class Parser {
                 "Esperado " + type);
     }
 
+    private Token consume(TokenType... types) {
+        for (TokenType type : types) {
+            if (check(type)) {
+                return advance();
+            }
+        }
+        throw error("Esperado " + String.join(" ou ",
+                java.util.Arrays.stream(types).map(Enum::name).toList()));
+    }
+
     /*
      * Apenas verifica o tipo do token atual,
      * sem avançar na lista.
@@ -462,15 +534,13 @@ public class Parser {
      * Cria uma mensagem de erro detalhada,
      * informando a linha e o token onde o problema ocorreu.
      */
-    private RuntimeException error(
+    private SyntacticError error(
             String message) {
 
-        return new RuntimeException(
-                "[ERRO SINTÁTICO] Linha "
-                        + peek().line
-                        + ": "
-                        + message
-                        + " encontrado "
-                        + peek().lexeme);
+        Token t = peek();
+        String lex = (t.lexeme == null || t.lexeme.isEmpty()) ? t.type.name() : t.lexeme;
+        return new SyntacticError(
+                t.line,
+                message + ", mas foi encontrado '" + lex + "'");
     }
 }

@@ -13,7 +13,7 @@ import java.util.Map;
  * em loop ate retornar um token do tipo EOF.
  *
  * Funcionalidades implementadas:
- *   - Numeros inteiros
+ *   - Numeros inteiros e decimais
  *   - Strings entre aspas duplas
  *   - Identificadores e palavras reservadas
  *   - Operadores aritmeticos: + - * /
@@ -66,11 +66,14 @@ public class Lexer {
      */
     private void initializeKeywords() {
         keywords.put("int",      TokenType.INT);
+        keywords.put("float",    TokenType.FLOAT);
+        keywords.put("void",     TokenType.VOID);
         keywords.put("if",       TokenType.IF);
         keywords.put("else",     TokenType.ELSE);
         keywords.put("while",    TokenType.WHILE);
         keywords.put("break",    TokenType.BREAK);
         keywords.put("continue", TokenType.CONTINUE);
+        keywords.put("return",   TokenType.RETURN);
         keywords.put("print",    TokenType.PRINT);
     }
 
@@ -156,8 +159,7 @@ public class Lexer {
 
             while (!(peek() == '*' && peekNext() == '/')) {
                 if (peek() == '\0')
-                    throw new RuntimeException(
-                        "Erro Lexico: comentario de bloco nao fechado na linha " + line);
+                    throw new LexicalError(line, "comentário de bloco não fechado");
                 if (peek() == '\n') line++;
                 next();
             }
@@ -166,12 +168,20 @@ public class Lexer {
     }
 
     /*
-     * Le um numero inteiro a partir da posicao atual.
-     * Continua lendo enquanto o caractere for um digito.
+     * Lê um literal inteiro ou decimal no formato dígitos.dígitos.
      */
     private Token scanNumber() {
         StringBuilder buffer = new StringBuilder();
         while (Character.isDigit(peek())) buffer.append(next());
+
+        if (peek() == '.') {
+            buffer.append(next());
+            if (!Character.isDigit(peek())) {
+                throw new LexicalError(line, "literal decimal deve ter dígitos após o ponto");
+            }
+            while (Character.isDigit(peek())) buffer.append(next());
+        }
+
         return new Token(TokenType.NUMBER, buffer.toString(), line);
     }
 
@@ -209,8 +219,7 @@ public class Lexer {
         }
 
         if (peek() == '\0')
-            throw new RuntimeException(
-                "Erro Lexico: string nao fechada na linha " + line);
+            throw new LexicalError(line, "string literal não fechada antes do fim do arquivo");
 
         next(); // consome a aspa de fechamento
         return new Token(TokenType.STRING, buffer.toString(), line);
@@ -292,10 +301,10 @@ public class Lexer {
             case ')': return new Token(TokenType.RPAREN,    ")", line);
             case '{': return new Token(TokenType.LBRACE,    "{", line);
             case '}': return new Token(TokenType.RBRACE,    "}", line);
+            case ',': return new Token(TokenType.COMMA,     ",", line);
             case ';': return new Token(TokenType.SEMICOLON, ";", line);
             default:
-                throw new RuntimeException(
-                    "Erro Lexico: caractere invalido '" + c + "' na linha " + line);
+                throw new LexicalError(line, "caractere inválido ou não reconhecido: '" + c + "'");
         }
     }
 }

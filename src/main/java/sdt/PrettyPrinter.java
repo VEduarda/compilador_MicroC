@@ -44,6 +44,8 @@ public class PrettyPrinter implements ASTVisitor {
         if (expr == null) return "";
         if (expr instanceof BinOpNode b) {
             return "(" + formatExpression(b.left) + " " + b.op + " " + formatExpression(b.right) + ")";
+        } else if (expr instanceof UnaryOpNode u) {
+            return "(" + u.op + formatExpression(u.expr) + ")";
         } else if (expr instanceof NumberNode n) {
             return n.value;
         } else if (expr instanceof IdentifierNode id) {
@@ -132,6 +134,39 @@ public class PrettyPrinter implements ASTVisitor {
     @Override
     public void visit(ContinueNode node) {
         output.append(getIndent()).append("continue;\n");
+    }
+
+    @Override
+    public void visit(ReturnNode node) {
+        output.append(getIndent()).append("return");
+        if (node.value != null) {
+            output.append(" ").append(formatExpression(node.value));
+        }
+        output.append(";\n");
+    }
+
+    @Override
+    public void visit(FunctionNode node) {
+        output.append(getIndent()).append(node.returnType).append(" ").append(node.name).append("(");
+        if (node.parameters != null && !node.parameters.isEmpty()) {
+            for (int i = 0; i < node.parameters.size(); i++) {
+                DeclarationNode p = node.parameters.get(i);
+                output.append(p.type).append(" ").append(p.name);
+                if (i < node.parameters.size() - 1) {
+                    output.append(", ");
+                }
+            }
+        }
+        output.append(") {\n");
+        indentLevel++;
+        formatBranchBody(node.body);
+        indentLevel--;
+        output.append(getIndent()).append("}\n");
+    }
+
+    @Override
+    public void visit(UnaryOpNode node) {
+        output.append(formatExpression(node));
     }
 
     @Override

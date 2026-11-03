@@ -45,6 +45,7 @@ public class SemanticAnalyzer {
 
     /* Tipos válidos reconhecidos por este subconjunto do MicroC. */
     private static final String TYPE_INT = "int";
+    private static final String TYPE_FLOAT = "float";
     private static final String TYPE_STRING = "string";
     private static final String TYPE_ERROR = "erro";
 
@@ -70,6 +71,14 @@ public class SemanticAnalyzer {
 
     public List<SemanticError> getErrors() {
         return errors;
+    }
+
+    /**
+     * Infere o tipo de uma expressão usando os símbolos da análise atual.
+     * Retorna "erro" se a expressão tiver uma inconsistência semântica.
+     */
+    public String getExpressionType(Node expression) {
+        return inferType(expression);
     }
 
     // ------------------------------------------------------------------
@@ -101,6 +110,12 @@ public class SemanticAnalyzer {
 
         } else if (node instanceof ContinueNode c) {
             visitContinue(c);
+
+        } else if (node instanceof ReturnNode r) {
+            visitReturn(r);
+
+        } else if (node instanceof FunctionNode f) {
+            visitFunction(f);
 
         } else {
             error(node.line, "R0-ComandoDesconhecido",
@@ -138,7 +153,7 @@ public class SemanticAnalyzer {
 
             // R3 - compatibilidade de tipos na inicialização
             if (!initType.equals(TYPE_ERROR)
-                    && !initType.equals(node.type)) {
+                    && !isAssignmentCompatible(node.type, initType)) {
 
                 error(node.line, "R3-TipoIncompativel",
                         "não é possível inicializar variável '" + node.name
@@ -187,7 +202,7 @@ public class SemanticAnalyzer {
 
         // R3 - compatibilidade de tipos na atribuição
         if (!valueType.equals(TYPE_ERROR)
-                && !valueType.equals(symbol.type)) {
+                && !isAssignmentCompatible(symbol.type, valueType)) {
 
             error(node.line, "R3-TipoIncompativel",
                     "não é possível atribuir um valor do tipo '" + valueType
@@ -277,6 +292,56 @@ public class SemanticAnalyzer {
         }
     }
 
+    private void visitReturn(ReturnNode node) {
+        if (node.value != null) {
+            inferType(node.value);
+        }
+    }
+
+    private void visitFunction(FunctionNode node) {
+        if (symbolTable.declaredInCurrentScope(node.name)) {
+            error(node.line, "R2-Redeclaracao",
+                    "função '" + node.name + "' já declarada anteriormente neste mesmo escopo");
+            return;
+        }
+
+        Symbol funcSym = new Symbol(
+                node.name,
+                node.returnType,
+                Category.FUNCTION,
+                symbolTable.currentScopeLevel(),
+                node.line,
+                true);
+        symbolTable.declare(funcSym);
+
+        symbolTable.enterScope();
+        if (node.parameters != null) {
+            for (DeclarationNode p : node.parameters) {
+                if (symbolTable.declaredInCurrentScope(p.name)) {
+                    error(p.line, "R2-Redeclaracao",
+                            "parâmetro '" + p.name + "' duplicado na função '" + node.name + "'");
+                } else {
+                    Symbol paramSym = new Symbol(
+                            p.name,
+                            p.type,
+                            Category.PARAMETER,
+                            symbolTable.currentScopeLevel(),
+                            p.line,
+                            true);
+                    symbolTable.declare(paramSym);
+                }
+            }
+        }
+
+        if (node.body != null) {
+            for (Node stmt : node.body.statements) {
+                visitStatement(stmt);
+            }
+        }
+
+        symbolTable.exitScope();
+    }
+
     /*
      * R6 - a condição de um if/while não pode ser uma string
      * (no MicroC não existe tipo booleano; usamos 'int' também
@@ -308,8 +373,8 @@ public class SemanticAnalyzer {
      */
     private String inferType(Node node) {
 
-        if (node instanceof NumberNode) {
-            return TYPE_INT;
+        if (node instanceof NumberNode number) {
+            return number.type;
         }
 
         if (node instanceof StringNode) {
@@ -322,6 +387,17 @@ public class SemanticAnalyzer {
 
         if (node instanceof BinOpNode bin) {
             return inferBinOpType(bin);
+        }
+
+        if (node instanceof UnaryOpNode u) {
+            String exprType = inferType(u.expr);
+            if (exprType.equals(TYPE_ERROR)) return TYPE_ERROR;
+            if (!isNumericType(exprType)) {
+                error(u.line, "R4-OperadorInvalidoParaTipo",
+                        "operador unário '" + u.op + "' não é suportado para o tipo '" + exprType + "'");
+                return TYPE_ERROR;
+            }
+            return u.op.equals("!") ? TYPE_INT : exprType;
         }
 
         error(node.line, "R0-ExpressaoDesconhecida",
@@ -366,8 +442,13 @@ public class SemanticAnalyzer {
             return TYPE_ERROR;
         }
 
-        // R4 - operandos devem ter o mesmo tipo
-        if (!leftType.equals(rightType)) {
+        if (leftType.equals(TYPE_STRING) || rightType.equals(TYPE_STRING)) {
+            error(bin.line, "R4-OperadorInvalidoParaTipo",
+                    "operador '" + bin.op + "' não é suportado para operandos do tipo 'string'");
+            return TYPE_ERROR;
+        }
+
+        if (!isNumericType(leftType) || !isNumericType(rightType)) {
 
             error(bin.line, "R4-OperandosIncompativeis",
                     "operador '" + bin.op + "' não pode ser aplicado entre '"
@@ -376,18 +457,31 @@ public class SemanticAnalyzer {
             return TYPE_ERROR;
         }
 
-        // Operações aritméticas/relacionais não fazem sentido entre
-        // strings neste subconjunto da linguagem (não há concatenação).
-        if (leftType.equals(TYPE_STRING)) {
-
-            error(bin.line, "R4-OperadorInvalidoParaTipo",
-                    "operador '" + bin.op + "' não é suportado para o tipo 'string'");
-
-            return TYPE_ERROR;
+        // Comparações e operações lógicas produzem int; aritmética promove
+        // para float quando qualquer operando é float.
+        if (isComparisonOrLogicalOperator(bin.op)) {
+            return TYPE_INT;
         }
 
-        // int op int -> int (relacionais também retornam int, como em C)
-        return TYPE_INT;
+        return leftType.equals(TYPE_FLOAT) || rightType.equals(TYPE_FLOAT)
+                ? TYPE_FLOAT : TYPE_INT;
+    }
+
+    private boolean isAssignmentCompatible(String targetType, String valueType) {
+        // A promoção definida pelo MicroC é unidirecional: int pode virar float.
+        return targetType.equals(valueType)
+                || (targetType.equals(TYPE_FLOAT) && valueType.equals(TYPE_INT));
+    }
+
+    private boolean isNumericType(String type) {
+        return TYPE_INT.equals(type) || TYPE_FLOAT.equals(type);
+    }
+
+    private boolean isComparisonOrLogicalOperator(String operator) {
+        return switch (operator) {
+            case "<", ">", "<=", ">=", "==", "!=", "&&", "||" -> true;
+            default -> false;
+        };
     }
 
     // ------------------------------------------------------------------
