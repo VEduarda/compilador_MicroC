@@ -236,8 +236,13 @@ Validação executada durante a atualização desta documentação:
 | Bateria SDT chamada pelo `Main` | 53 verificações passaram (100% aprovado) |
 | Verificações focadas de `float` | `a + b` inferido como `float`; `3 + 2.5` executado como `5.5`; conversão `int` para `float` executada; `float` para `int` rejeitado na semântica |
 
-A mensagem final do `Main` de “100% de sucesso” é plenamente confirmada pelos
-totais de verificações das baterias: zero falhas registradas.
+A mensagem final do `Main` de “100% de sucesso” só é exibida quando todos os
+testes e cenários são concluídos sem falhas. O pipeline de testes e os executáveis
+do projeto (`Main`, `SDTTestRunner` e `OptimizationTestRunner`) propagam
+estritamente o código de saída do processo:
+- **Código `0`:** todos os testes e verificações passaram com sucesso (0 falhas);
+- **Código diferente de zero (`1`):** pelo menos uma verificação falhou, ocorreu erro de
+  execução ou divergência observável na preservação semântica.
 
 Para compilar e executar a demonstração:
 
@@ -263,11 +268,7 @@ compilador mais completo, o status das pendências é:
    nos testes: `a + 0 -> a`, `0 + b -> b`, `c * 1 -> c`, `d * 0 -> 0`, `e - 0 -> e`
    e `f / 1 -> f`. Corrigir também a eliminação de subexpressões comuns (CSE).
    Garantir que todas as verificações passem com 100% de sucesso.
-6. Tornar o pipeline de testes capaz de reportar falha como resultado não-zero,
-   para que verificações malsucedidas não sejam apresentadas como sucesso.
-7. Criar testes automatizados de unidade e integração para cada etapa e para os
-   exemplos exigidos.
-6. Tornar o pipeline de testes capaz de reportar falha como resultado não-zero,
+6. **[CONCLUÍDO]** Tornar o pipeline de testes capaz de reportar falha como resultado não-zero,
    para que verificações malsucedidas não sejam apresentadas como sucesso.
 7. Criar testes automatizados de unidade e integração para cada etapa e para os
    exemplos exigidos.
