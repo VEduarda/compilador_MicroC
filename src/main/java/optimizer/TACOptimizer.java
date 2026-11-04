@@ -210,6 +210,18 @@ public class TACOptimizer {
     // 2. Simplificações Algébricas
     // =========================================================================
 
+    private static boolean isZero(String s) {
+        if (s == null) return false;
+        String trimmed = s.trim();
+        return trimmed.equals("0") || trimmed.equals("0.0");
+    }
+
+    private static boolean isOne(String s) {
+        if (s == null) return false;
+        String trimmed = s.trim();
+        return trimmed.equals("1") || trimmed.equals("1.0");
+    }
+
     private boolean passAlgebraicSimplification(List<TACInstruction> program) {
         boolean anyChange = false;
 
@@ -221,8 +233,8 @@ public class TACOptimizer {
             String op = inst.op;
             String right = inst.op2;
 
-            // x + 0 -> x
-            if (op.equals("+") && right.equals("0")) {
+            // a + 0 -> a
+            if (op.equals("+") && isZero(right)) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = left;
                 inst.op = null;
@@ -231,8 +243,8 @@ public class TACOptimizer {
                         "Identidade aditiva: " + left + " + 0 = " + left);
                 anyChange = true;
             }
-            // 0 + x -> x
-            else if (op.equals("+") && left.equals("0")) {
+            // 0 + b -> b
+            else if (op.equals("+") && isZero(left)) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = right;
                 inst.op = null;
@@ -241,8 +253,8 @@ public class TACOptimizer {
                         "Identidade aditiva: 0 + " + right + " = " + right);
                 anyChange = true;
             }
-            // x - 0 -> x
-            else if (op.equals("-") && right.equals("0")) {
+            // e - 0 -> e
+            else if (op.equals("-") && isZero(right)) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = left;
                 inst.op = null;
@@ -261,8 +273,8 @@ public class TACOptimizer {
                         "Subtração de mesmo termo: " + left + " - " + right + " = 0");
                 anyChange = true;
             }
-            // x * 1 -> x
-            else if (op.equals("*") && right.equals("1")) {
+            // c * 1 -> c
+            else if (op.equals("*") && isOne(right)) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = left;
                 inst.op = null;
@@ -271,8 +283,8 @@ public class TACOptimizer {
                         "Identidade multiplicativa: " + left + " * 1 = " + left);
                 anyChange = true;
             }
-            // 1 * x -> x
-            else if (op.equals("*") && left.equals("1")) {
+            // 1 * c -> c
+            else if (op.equals("*") && isOne(left)) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = right;
                 inst.op = null;
@@ -281,8 +293,8 @@ public class TACOptimizer {
                         "Identidade multiplicativa: 1 * " + right + " = " + right);
                 anyChange = true;
             }
-            // x * 0 -> 0 ou 0 * x -> 0
-            else if (op.equals("*") && (right.equals("0") || left.equals("0"))) {
+            // d * 0 -> 0 ou 0 * d -> 0
+            else if (op.equals("*") && (isZero(right) || isZero(left))) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = "0";
                 inst.op = null;
@@ -291,8 +303,8 @@ public class TACOptimizer {
                         "Anulação multiplicativa por zero = 0");
                 anyChange = true;
             }
-            // x / 1 -> x
-            else if (op.equals("/") && right.equals("1")) {
+            // f / 1 -> f
+            else if (op.equals("/") && isOne(right)) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = left;
                 inst.op = null;
@@ -301,7 +313,27 @@ public class TACOptimizer {
                         "Divisão por 1: " + left + " / 1 = " + left);
                 anyChange = true;
             }
-            // x == x -> 1, x != x -> 0
+            // 0 / x -> 0 (quando x != 0)
+            else if (op.equals("/") && isZero(left) && !isZero(right)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = "0";
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Divisão de zero por número não-nulo = 0");
+                anyChange = true;
+            }
+            // x / x -> 1 (quando x != 0)
+            else if (op.equals("/") && left.equals(right) && !isZero(left)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = "1";
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Divisão de mesmo termo = 1");
+                anyChange = true;
+            }
+            // Comparações reflexivas: x == x -> 1, x != x -> 0
             else if (op.equals("==") && left.equals(right)) {
                 inst.kind = Kind.ASSIGN_COPY;
                 inst.op1 = "1";
@@ -317,6 +349,72 @@ public class TACOptimizer {
                 inst.op2 = null;
                 report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
                         "Comparação reflexiva: " + left + " != " + right + " = 0");
+                anyChange = true;
+            }
+            // Identidades booleanas: x && 1 -> x, x && 0 -> 0, x || 1 -> 1, x || 0 -> x
+            else if (op.equals("&&") && isZero(right)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = "0";
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Conjunção com falso: " + left + " && 0 = 0");
+                anyChange = true;
+            } else if (op.equals("&&") && isZero(left)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = "0";
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Conjunção com falso: 0 && " + right + " = 0");
+                anyChange = true;
+            } else if (op.equals("&&") && isOne(right)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = left;
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Identidade booleana: " + left + " && 1 = " + left);
+                anyChange = true;
+            } else if (op.equals("&&") && isOne(left)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = right;
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Identidade booleana: 1 && " + right + " = " + right);
+                anyChange = true;
+            } else if (op.equals("||") && isOne(right)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = "1";
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Disjunção com verdadeiro: " + left + " || 1 = 1");
+                anyChange = true;
+            } else if (op.equals("||") && isOne(left)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = "1";
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Disjunção com verdadeiro: 1 || " + right + " = 1");
+                anyChange = true;
+            } else if (op.equals("||") && isZero(right)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = left;
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Identidade booleana: " + left + " || 0 = " + left);
+                anyChange = true;
+            } else if (op.equals("||") && isZero(left)) {
+                inst.kind = Kind.ASSIGN_COPY;
+                inst.op1 = right;
+                inst.op = null;
+                inst.op2 = null;
+                report.addTransformation("Algebraic Simplification", beforeText, inst.toTAC(),
+                        "Identidade booleana: 0 || " + right + " = " + right);
                 anyChange = true;
             }
         }
@@ -343,7 +441,7 @@ public class TACOptimizer {
             }
 
             if (inst.kind == Kind.ASSIGN_BIN) {
-                String exprKey = inst.op1 + " " + inst.op + " " + inst.op2;
+                String exprKey = canonicalExprKey(inst.op1, inst.op, inst.op2);
                 String beforeText = inst.toTAC();
 
                 if (exprMap.containsKey(exprKey)) {
@@ -356,22 +454,47 @@ public class TACOptimizer {
                     report.addTransformation("Common Subexpression Elimination", beforeText, inst.toTAC(),
                             "Expressão comum '" + exprKey + "' já calculada em '" + existingVar + "'");
                     anyChange = true;
-                } else {
-                    exprMap.put(exprKey, inst.dest);
-                }
-            }
 
-            // Se uma variável é reescrita, remove quaisquer subexpressões que a utilizam
-            String def = inst.getDef();
-            if (def != null) {
-                exprMap.entrySet().removeIf(entry -> {
-                    String[] parts = entry.getKey().split(" ");
-                    return parts[0].equals(def) || (parts.length > 2 && parts[2].equals(def)) || entry.getValue().equals(def);
-                });
+                    // O destino foi redefinido; invalida expressões que dependiam dele antes
+                    invalidateExprMap(exprMap, inst.dest);
+                } else {
+                    // Invalida quaisquer expressões que usavam inst.dest como operando ou resultado antes
+                    invalidateExprMap(exprMap, inst.dest);
+
+                    // Só registra no exprMap se o destino não sobrescreve os próprios operandos (ex.: x = x + 1)
+                    if (!inst.dest.equals(inst.op1) && !inst.dest.equals(inst.op2)) {
+                        exprMap.put(exprKey, inst.dest);
+                    }
+                }
+            } else {
+                // Outras instruções com destino (ASSIGN_COPY, ASSIGN_UNARY) invalidam mapeamentos que usam esse destino
+                String def = inst.getDef();
+                if (def != null) {
+                    invalidateExprMap(exprMap, def);
+                }
             }
         }
 
         return anyChange;
+    }
+
+    private String canonicalExprKey(String op1, String op, String op2) {
+        if (op.equals("+") || op.equals("*") || op.equals("==") || op.equals("!=")) {
+            if (op1.compareTo(op2) > 0) {
+                return op2 + " " + op + " " + op1;
+            }
+        }
+        return op1 + " " + op + " " + op2;
+    }
+
+    private void invalidateExprMap(Map<String, String> exprMap, String varName) {
+        if (varName == null) return;
+        exprMap.entrySet().removeIf(entry -> {
+            String[] parts = entry.getKey().split(" ");
+            return parts[0].equals(varName) 
+                    || (parts.length > 2 && parts[2].equals(varName)) 
+                    || entry.getValue().equals(varName);
+        });
     }
 
     // =========================================================================
@@ -516,6 +639,17 @@ public class TACOptimizer {
             usedVariables.addAll(inst.getUses());
         }
 
+        // Verifica se o programa possui comandos com efeitos observáveis (prints, retornos, desvios ou variáveis do usuário)
+        boolean hasRoots = false;
+        for (TACInstruction inst : program) {
+            if (inst.kind == Kind.PRINT || inst.kind == Kind.RETURN 
+                    || inst.kind == Kind.GOTO || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE
+                    || (inst.getDef() != null && !TACInstruction.isTemporary(inst.getDef()))) {
+                hasRoots = true;
+                break;
+            }
+        }
+
         for (int i = 0; i < program.size(); i++) {
             TACInstruction inst = program.get(i);
 
@@ -531,11 +665,13 @@ public class TACOptimizer {
             }
 
             // B) Temporária nunca lida: t = ...
-            // Temporárias geradas pelo compilador (t1, t2, ...) que não constam no conjunto de usos são código morto!
+            // Temporárias geradas pelo compilador (t1, t2, ...) que não constam no conjunto de usos são código morto
+            // apenas quando o programa possui raízes de efeitos observáveis (em trechos isolados de temporárias,
+            // elas representam o próprio resultado sintetizado).
             if ((inst.kind == Kind.ASSIGN_BIN || inst.kind == Kind.ASSIGN_UNARY || inst.kind == Kind.ASSIGN_COPY)
                     && TACInstruction.isTemporary(inst.dest)) {
 
-                if (!usedVariables.contains(inst.dest)) {
+                if (hasRoots && !usedVariables.contains(inst.dest)) {
                     String beforeText = inst.toTAC();
                     program.remove(i);
                     i--;

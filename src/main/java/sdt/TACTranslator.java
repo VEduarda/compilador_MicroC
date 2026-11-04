@@ -10,8 +10,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Tradutor 2: TACTranslator (Gerador de Código Intermediário de Três Endereços - TAC / IR).
@@ -78,6 +80,18 @@ public class TACTranslator implements ASTVisitor {
 
     /** Tipos declarados por escopo para emitir conversões int -> float no TAC. */
     private final Deque<Map<String, String>> typeScopes = new ArrayDeque<>();
+
+    /** Pilha de escopos que mapeia o identificador do fonte para seu nome único na IR (Item 6). */
+    private final Deque<Map<String, String>> variableScopes = new ArrayDeque<>();
+
+    /** Nível atual de aninhamento de escopos (0 = escopo global, 1 = bloco, etc.). */
+    private int currentScopeLevel = 0;
+
+    /** Conjunto de nomes de variáveis já alocados na IR para evitar colisões entre blocos irmãos. */
+    private final Set<String> allocatedIrNames = new HashSet<>();
+
+    /** Contagem total de declarações de cada identificador no programa. */
+    private final Map<String, Integer> programDeclarationCounts = new HashMap<>();
 
     /**
      * Par de rótulos (L_start, L_end) do laço de repetição atual para desvios de break e continue (Melhoria 5).
@@ -210,6 +224,19 @@ public class TACTranslator implements ASTVisitor {
         knownConstants.clear();
         typeScopes.clear();
         typeScopes.push(new HashMap<>());
+        variableScopes.clear();
+        variableScopes.push(new HashMap<>());
+        currentScopeLevel = 0;
+        allocatedIrNames.clear();
+        programDeclarationCounts.clear();
+
+        if (this.symbolTable != null) {
+            for (Symbol s : this.symbolTable.getHistory()) {
+                programDeclarationCounts.put(s.name, programDeclarationCounts.getOrDefault(s.name, 0) + 1);
+            }
+        } else {
+            countDeclarations(node, programDeclarationCounts);
+        }
 
         if (usePool) {
             tempPool.reset();
@@ -220,6 +247,82 @@ public class TACTranslator implements ASTVisitor {
         }
 
         return new ArrayList<>(instructions);
+    }
+
+    private void countDeclarations(Node node, Map<String, Integer> counts) {
+        if (node == null) return;
+        if (node instanceof DeclarationNode d) {
+            counts.put(d.name, counts.getOrDefault(d.name, 0) + 1);
+        } else if (node instanceof ProgramNode p) {
+            for (Node s : p.statements) countDeclarations(s, counts);
+        } else if (node instanceof BlockNode b) {
+            for (Node s : b.statements) countDeclarations(s, counts);
+        } else if (node instanceof IfNode i) {
+            countDeclarations(i.thenBranch, counts);
+            if (i.elseBranch != null) countDeclarations(i.elseBranch, counts);
+        } else if (node instanceof WhileNode w) {
+            countDeclarations(w.body, counts);
+        } else if (node instanceof FunctionNode f) {
+            if (f.parameters != null) {
+                for (DeclarationNode p : f.parameters) countDeclarations(p, counts);
+            }
+            if (f.body != null) countDeclarations(f.body, counts);
+        }
+    }
+
+    /**
+     * Declara uma variável no escopo atual e sintetiza seu identificador na IR.
+     * Preserva escopos e identidade: quando há sombreamento (shadowing) ou
+     * redeclaração em escopos distintos, qualifica o nome para manter a identidade.
+     */
+    private String declareVariable(String name) {
+        String irName;
+        if (currentScopeLevel == 0) {
+            irName = name;
+        } else {
+            boolean isShadowing = isDeclaredInOuterScope(name);
+            int totalDecls = programDeclarationCounts.getOrDefault(name, 1);
+            if (isShadowing || totalDecls > 1) {
+                int level = currentScopeLevel;
+                irName = name + "_" + level;
+                while (allocatedIrNames.contains(irName)) {
+                    level++;
+                    irName = name + "_" + level;
+                }
+            } else {
+                irName = name;
+            }
+        }
+        allocatedIrNames.add(irName);
+        variableScopes.peek().put(name, irName);
+        return irName;
+    }
+
+    private boolean isDeclaredInOuterScope(String name) {
+        boolean skipFirst = true;
+        for (Map<String, String> scope : variableScopes) {
+            if (skipFirst) {
+                skipFirst = false;
+                continue;
+            }
+            if (scope.containsKey(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Resolve o identificador intermediário correspondente à variável,
+     * consultando os escopos do mais interno para o mais externo.
+     */
+    private String resolveVariableName(String name) {
+        for (Map<String, String> scope : variableScopes) {
+            if (scope.containsKey(name)) {
+                return scope.get(name);
+            }
+        }
+        return name;
     }
 
     /**
@@ -258,37 +361,42 @@ public class TACTranslator implements ASTVisitor {
 
     @Override
     public void visit(DeclarationNode node) {
-        // VarDeclNode
+        // VarDeclNode com preservação de escopos e identidades
+        String irName = declareVariable(node.name);
         actionLog.add("[visit DeclarationNode] Declaração de variável '" + node.name 
-                + "' do tipo " + node.type);
+                + "' (IR: '" + irName + "') do tipo " + node.type);
         if (node.initializer != null) {
             node.initializer.accept(this);
             String val = lastPlace;
             if ("float".equals(node.type)) {
                 val = convertToFloat(val);
             }
-            emit(node.name + " = " + val, "VarDecl: inicialização de '" + node.name + "'");
+            emit(irName + " = " + val, "VarDecl: inicialização de '" + irName + "'");
             releaseTemp(val);
-            recordKnownConstant(node.name, val);
+            recordKnownConstant(irName, node.name, val);
         } else {
-            actionLog.add("[DeclarationNode] Variável '" + node.name + "' sem valor inicial");
+            actionLog.add("[DeclarationNode] Variável '" + irName + "' sem valor inicial");
+            knownConstants.remove(irName);
             knownConstants.remove(node.name);
         }
+        typeScopes.peek().put(irName, node.type);
         typeScopes.peek().put(node.name, node.type);
     }
 
     @Override
     public void visit(AssignmentNode node) {
-        // AssignNode
-        actionLog.add("[visit AssignmentNode] Atribuição para variável '" + node.name + "'");
+        // AssignNode com resolução lexical de escopo
+        String irName = resolveVariableName(node.name);
+        actionLog.add("[visit AssignmentNode] Atribuição para variável '" + node.name 
+                + "' (IR: '" + irName + "')");
         node.value.accept(this);
         String val = lastPlace;
-        if ("float".equals(lookupType(node.name))) {
+        if ("float".equals(lookupType(irName))) {
             val = convertToFloat(val);
         }
-        emit(node.name + " = " + val, "Assign: atribuição a '" + node.name + "'");
+        emit(irName + " = " + val, "Assign: atribuição a '" + irName + "'");
         releaseTemp(val);
-        recordKnownConstant(node.name, val);
+        recordKnownConstant(irName, node.name, val);
     }
 
     @Override
@@ -444,9 +552,9 @@ public class TACTranslator implements ASTVisitor {
 
     @Override
     public void visit(IdentifierNode node) {
-        // VariableNode
-        lastPlace = node.name;
-        actionLog.add("[visit IdentifierNode] Variável " + node.name + " -> lastPlace");
+        // VariableNode com resolução lexical de escopo
+        lastPlace = resolveVariableName(node.name);
+        actionLog.add("[visit IdentifierNode] Variável " + node.name + " (" + lastPlace + ") -> lastPlace");
     }
 
     @Override
@@ -457,12 +565,17 @@ public class TACTranslator implements ASTVisitor {
 
     @Override
     public void visit(BlockNode node) {
-        actionLog.add("[visit BlockNode] Início de bloco com " + node.statements.size() + " comandos");
+        actionLog.add("[visit BlockNode] Início de bloco com " + node.statements.size() 
+                + " comandos (nível " + (currentScopeLevel + 1) + ")");
+        currentScopeLevel++;
+        variableScopes.push(new HashMap<>());
         typeScopes.push(new HashMap<>());
         for (Node stmt : node.statements) {
             stmt.accept(this);
         }
         typeScopes.pop();
+        variableScopes.pop();
+        currentScopeLevel--;
         actionLog.add("[visit BlockNode] Fim de bloco");
     }
 
@@ -505,9 +618,13 @@ public class TACTranslator implements ASTVisitor {
     public void visit(FunctionNode node) {
         actionLog.add("[visit FunctionNode] Início da função '" + node.name + "'");
         emit(node.name + ":", "Rótulo da função '" + node.name + "'");
+        currentScopeLevel++;
+        variableScopes.push(new HashMap<>());
         typeScopes.push(new HashMap<>());
         if (node.parameters != null) {
             for (DeclarationNode parameter : node.parameters) {
+                String pIrName = declareVariable(parameter.name);
+                typeScopes.peek().put(pIrName, parameter.type);
                 typeScopes.peek().put(parameter.name, parameter.type);
             }
         }
@@ -515,6 +632,8 @@ public class TACTranslator implements ASTVisitor {
             node.body.accept(this);
         }
         typeScopes.pop();
+        variableScopes.pop();
+        currentScopeLevel--;
         actionLog.add("[visit FunctionNode] Fim da função '" + node.name + "'");
     }
 
@@ -598,6 +717,8 @@ public class TACTranslator implements ASTVisitor {
      */
     public void registerConstant(String name, int value) {
         knownConstants.put(name, value);
+        String irName = resolveVariableName(name);
+        knownConstants.put(irName, value);
         if (symbolTable != null) {
             Symbol sym = symbolTable.lookup(name);
             if (sym != null) {
@@ -609,13 +730,15 @@ public class TACTranslator implements ASTVisitor {
     /**
      * Atualiza o valor constante na tabela de símbolos apenas se o símbolo for uma constante declarada.
      */
-    private void recordKnownConstant(String name, String val) {
+    private void recordKnownConstant(String irName, String originalName, String val) {
         if (symbolTable != null) {
-            Symbol sym = symbolTable.lookup(name);
+            Symbol sym = symbolTable.lookup(originalName);
             if (sym != null && sym.isConstant()) {
                 sym.constantValue = val;
                 try {
-                    knownConstants.put(name, Integer.parseInt(val));
+                    int intVal = Integer.parseInt(val);
+                    knownConstants.put(irName, intVal);
+                    knownConstants.put(originalName, intVal);
                 } catch (NumberFormatException ignored) {}
             }
         }

@@ -80,6 +80,9 @@ public class Parser {
         if (match(TokenType.RETURN))
             return parseReturn();
 
+        if (check(TokenType.LBRACE))
+            return parseBlock();
+
         if (check(TokenType.ID))
             return parseAssignment();
 

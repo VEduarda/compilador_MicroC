@@ -215,6 +215,57 @@ public class OptimizationTestRunner {
         check(resErro.semanticErrors.size() >= 1, "Pelo menos 1 erro semântico registrado");
 
         // ---------------------------------------------------------------------
+        // TESTE 9: Preservação de Escopos e Identidade de Variáveis (Item 6)
+        // ---------------------------------------------------------------------
+        System.out.println("\n--- TESTE 9: Preservação de Escopos e Identidade de Variáveis (Item 6) ---");
+        String progShadow = """
+        int x = 10;
+        {
+            int x = 20;
+            print(x);
+        }
+        print(x);
+        """;
+        CompilationResult resShadow = pipeline.compileString(progShadow);
+
+        check(resShadow.success, "Pipeline compilou programa com sombreamento de variáveis");
+        check(resShadow.executionResult != null, "Back-end executou programa com escopos distintos");
+        check(resShadow.executionResult.getOutputLines().equals(List.of("20", "10")),
+                "Saída observável preservada: 20 (bloco interno) seguido de 10 (bloco externo)");
+        check(resShadow.executionResult.getVariable("x").equals(10),
+                "Memória do interpretador preserva escopo 0 (x = 10)");
+        check(resShadow.executionResult.getVariable("x", 1).equals(20),
+                "Memória do interpretador preserva escopo interno 1 (x_1 = 20)");
+        check(resShadow.rawTAC.stream().anyMatch(s -> s.startsWith("x_1 = 20")),
+                "TAC preserva identidade distinta da variável interna (x_1)");
+
+        // ---------------------------------------------------------------------
+        // TESTE 10: Preservação de Escopos em Blocos Irmãos e Aninhados (Item 6)
+        // ---------------------------------------------------------------------
+        System.out.println("\n--- TESTE 10: Preservação de Escopos em Blocos Irmãos e Aninhados (Item 6) ---");
+        String progSibling = """
+        int a = 1;
+        {
+            int a = 2;
+            print(a);
+        }
+        {
+            int a = 3;
+            print(a);
+        }
+        print(a);
+        """;
+        CompilationResult resSibling = pipeline.compileString(progSibling);
+        check(resSibling.success, "Blocos irmãos com mesmo identificador compilados com sucesso");
+        check(resSibling.executionResult.getOutputLines().equals(List.of("2", "3", "1")),
+                "Saídas dos blocos irmãos e externo preservadas (2, 3, 1)");
+        check(resSibling.executionResult.getVariable("a").equals(1), "Escopo externo tem a = 1");
+        check(resSibling.executionResult.getVariable("a_1") != null && resSibling.executionResult.getVariable("a_1").equals(2),
+                "Primeiro bloco irmão tem identidade a_1 = 2");
+        check(resSibling.executionResult.getVariable("a_2") != null && resSibling.executionResult.getVariable("a_2").equals(3),
+                "Segundo bloco irmão tem identidade a_2 = 3");
+
+        // ---------------------------------------------------------------------
         // Resumo final
         // ---------------------------------------------------------------------
         System.out.println("\n================================================================================");
