@@ -95,11 +95,13 @@ A árvore sintática construída pelo Parser permanece **estritamente intocada e
 ### 3.1 Análise Léxica (Scanner)
 O analisador léxico (`Lexer.java`) consome a cadeia linear de caracteres e a converte em uma lista de objetos `Token`, categorizados segundo a enumeração `TokenType`:
 
-* **Palavras Reservadas:** `int`, `if`, `else`, `while`, `print`, `break`, `continue`.
-* **Identificadores e Literais:** Identificadores alfanuméricos (`[a-zA-Z_][a-zA-Z0-9_]*`), números inteiros decimais (`[0-9]+`) e strings delimitadas por aspas duplas.
+* **Palavras Reservadas:** `int`, `float`, `void`, `if`, `else`, `while`, `return`, `print`, `break`, `continue`.
+* **Identificadores e Literais:** Identificadores alfanuméricos (`[a-zA-Z_][a-zA-Z0-9_]*`), números inteiros (`[0-9]+`), literais decimais no formato `dígitos.dígitos` e strings delimitadas por aspas duplas.
 * **Operadores Aritméticos e Relacionais:** `+`, `-`, `*`, `/`, `=`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||`, `!`.
 * **Delimitadores:** `(`, `)`, `{`, `}`, `;`.
 * **Tratamento de Linha e Posição:** Cada token registra a linha de sua ocorrência no código-fonte para rastreamento preciso de erros sintáticos e semânticos.
+
+> **Implementação recente:** o scanner passou a reconhecer palavras reservadas do tipo `float`, além de números decimais usando pontos, como `2.5`. Isso foi uma mudança essencial para o suporte completo do subconjunto numérico do MicroC.
 
 ### 3.2 Análise Sintática e Gramática (Parser & AST)
 O analisador sintático (`Parser.java`) adota o método de **Descida Recursiva Preditiva**, reconhecendo a gramática livre de contexto (GLC) do MicroC e construindo a Árvore Sintática Abstrata (AST):
@@ -107,7 +109,7 @@ O analisador sintático (`Parser.java`) adota o método de **Descida Recursiva P
 ```ebnf
 Program         ::= Statement* EOF
 Statement       ::= VarDecl | Assignment | PrintStmt | IfStmt | WhileStmt | BreakStmt | ContinueStmt | Block
-VarDecl         ::= "int" ID ("=" Expression)? ";"
+VarDecl         ::= ("int" | "float") ID ("=" Expression)? ";"
 Assignment      ::= ID "=" Expression ";"
 PrintStmt       ::= "print" "(" Expression ")" ";"
 IfStmt          ::= "if" "(" Expression ")" Statement ("else" Statement)?
@@ -130,11 +132,30 @@ A hierarquia da AST é modelada em `Nodes.java`, onde cada nó herda de `Node` e
 public abstract void accept(ASTVisitor visitor);
 ```
 
+Além disso, `NumberNode` agora preserva o tipo do literal, diferenciando `int` e `float` em tempo de AST para uso posterior na análise semântica e na geração de TAC.
+
 ### 3.3 Análise Semântica e Gestão de Escopos (SymbolTable)
 O analisador semântico (`SemanticAnalyzer.java`) decora a AST e valida as regras de contexto da linguagem antes da geração de código:
 
 * **Tabela de Símbolos em Pilha de Escopos (`SymbolTable.java`):** Implementada via `Deque<Map<String, Symbol>>`. Aberturas de bloco `{` disparam `enterScope()` e fechamentos `}` executam `exitScope()`.
 * **Sombreamento Válido (Shadowing):** A busca por identificadores (`lookup`) opera do topo da pilha (escopo mais interno) para a base (escopo global), permitindo que variáveis internas declarem o mesmo identificador de um escopo externo sem colisão.
+* **Suporte recente a tipos numéricos mistos:** o analisador passa a inferir corretamente expressões mistas como `int + float` e a propagá-las para `float`.
+
+```c
+int a = 3;
+float b = 2.5;
+print(a + b);  // resultado tipado como float
+```
+
+A regra implementada é explícita:
+
+- `int + float -> float`
+- `float + int -> float`
+- `int` pode ser implicamente convertido para `float` em atribuição
+- `float` para `int` é rejeitado para evitar truncamento silencioso
+
+A consulta `SemanticAnalyzer.getExpressionType(node)` permite verificar o tipo inferido da expressão em tempo de análise, reduzindo ambiguidades antes da geração do TAC.
+
 * **Tabela Completa de Regras Semânticas Validadas:**
 
 | Regra | Código / Descrição | Exemplo que Dispara o Erro |
@@ -274,9 +295,23 @@ Reconstrói o código-fonte canônico do MicroC de forma padronizada:
 
 ---
 
-## 5. Detalhamento das Três Melhorias Avançadas Implementadas
+## 5. Estado das Melhorias e Implementações Atuais
 
-Para enriquecer o motor de compilação e otimizar o código intermediário gerado, a equipe implementou e comprovou experimentalmente **três melhorias avançadas**:
+No ciclo atual, as melhorias efetivamente atendidas e documentadas no projeto foram:
+
+- **Melhorias realizadas:** 1, 2, 6, 7, 8 e 9.
+- **Melhorias não concluídas neste conjunto:** 3 e 4.
+
+Esse balanço reflete o estado real do código: a base do compilador já atende numericamente a linguagem MicroC, com suporte a `float`, promoção de tipos e validação semântica, enquanto melhorias mais avançadas de otimização e backend seguem como extensão do escopo.
+
+### Descrição breve das melhorias relevantes
+
+- **Melhoria 3:** expansão da otimização para simplificação de subexpressões, eliminação de redundâncias e propagação de valores com alcance maior no TAC.
+- **Melhoria 4:** integração da etapa final de geração de código, com a saída em representação alvo mais próxima do assembly/execução real.
+- **Melhoria 8:** reforço da validação estrutural do compilador, cobrindo casos mais complexos de escopo, atribuição e uso de variáveis em contextos aninhados.
+- **Melhoria 9:** refinamento da correção semântica e da robustez da execução, com validação de comportamentos nas interações entre otimização, escopo e execução do TAC.
+
+As melhorias 8 e 9 foram incorporadas como parte do refinamento do projeto e aparecem no código/execução atual como estabilização da semântica e do back-end; as melhorias 3 e 4 ficaram como extensões do escopo, não concluídas nesta rodada da entrega.
 
 ---
 
