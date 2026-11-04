@@ -214,6 +214,16 @@ public class PostfixTranslator implements ASTVisitor {
         }
     }
 
+    @Override
+    public void visit(FunctionCallNode node) {
+        int startIdx = tokens.size();
+        for (Node arg : node.arguments) {
+            arg.accept(this);
+        }
+        emit(node.name + "()");
+        captureExpression(startIdx, "Chamada de função " + node.name);
+    }
+
     private void captureExpression(int startIdx, String label) {
         List<String> sub = new ArrayList<>();
         for (int i = startIdx; i < tokens.size(); i++) {

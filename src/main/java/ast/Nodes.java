@@ -1,5 +1,6 @@
 package ast;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /*
@@ -192,23 +193,35 @@ public class Nodes {
         public final String type;
         public final String name;
         public final Node initializer;
+        public final boolean isConst;
 
         public DeclarationNode(
                 String type,
                 String name,
                 Node initializer) {
 
+            this(type, name, initializer, false);
+        }
+
+        public DeclarationNode(
+                String type,
+                String name,
+                Node initializer,
+                boolean isConst) {
+
             this.type = type;
             this.name = name;
             this.initializer = initializer;
+            this.isConst = isConst;
         }
 
         @Override
         public void print(String indent) {
 
+            String prefix = isConst ? "const " : "";
             System.out.println(
                     indent + "Declaration(" +
-                    type + " " + name + ")");
+                    prefix + type + " " + name + ")");
 
             if (initializer != null) {
                 initializer.print(indent + "  ");
@@ -454,6 +467,35 @@ public class Nodes {
                 }
             }
             body.print(indent + "  ");
+        }
+
+        @Override
+        public void accept(ASTVisitor visitor) {
+            visitor.visit(this);
+        }
+    }
+
+    /*
+     * Representa uma chamada de função (ex: soma(10, 20)).
+     */
+    public static class FunctionCallNode extends Node {
+
+        public final String name;
+        public final List<Node> arguments;
+
+        public FunctionCallNode(String name, List<Node> arguments) {
+            this.name = name;
+            this.arguments = arguments != null ? arguments : new ArrayList<>();
+        }
+
+        @Override
+        public void print(String indent) {
+            System.out.println(indent + "FunctionCall(" + name + ")");
+            if (arguments != null && !arguments.isEmpty()) {
+                for (Node arg : arguments) {
+                    arg.print(indent + "  ");
+                }
+            }
         }
 
         @Override

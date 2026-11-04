@@ -39,9 +39,10 @@ import java.util.List;
  */
 public class SemanticAnalyzer {
 
-    private final SymbolTable symbolTable = new SymbolTable();
+    private SymbolTable symbolTable = new SymbolTable();
     private final List<SemanticError> errors = new ArrayList<>();
     private int loopDepth = 0;
+    private FunctionNode currentFunction = null;
 
     /* Tipos válidos reconhecidos por este subconjunto do MicroC. */
     private static final String TYPE_INT = "int";
@@ -55,8 +56,36 @@ public class SemanticAnalyzer {
      * é semanticamente válido).
      */
     public List<SemanticError> analyze(ProgramNode program) {
+        symbolTable = new SymbolTable();
         errors.clear();
         loopDepth = 0;
+        currentFunction = null;
+
+        // Pré-registro de assinaturas de funções globais
+        for (Node stmt : program.statements) {
+            if (stmt instanceof FunctionNode fn) {
+                if (symbolTable.declaredInCurrentScope(fn.name)) {
+                    error(fn.line, "R2-Redeclaracao",
+                            "função '" + fn.name + "' já declarada anteriormente neste mesmo escopo");
+                } else {
+                    List<String> paramTypes = new ArrayList<>();
+                    if (fn.parameters != null) {
+                        for (DeclarationNode p : fn.parameters) {
+                            paramTypes.add(p.type);
+                        }
+                    }
+                    Symbol funcSym = new Symbol(
+                            fn.name,
+                            fn.returnType,
+                            Category.FUNCTION,
+                            symbolTable.currentScopeLevel(),
+                            fn.line,
+                            true);
+                    funcSym.paramTypes = paramTypes;
+                    symbolTable.declare(funcSym);
+                }
+            }
+        }
 
         for (Node stmt : program.statements) {
             visitStatement(stmt);
@@ -117,6 +146,9 @@ public class SemanticAnalyzer {
         } else if (node instanceof FunctionNode f) {
             visitFunction(f);
 
+        } else if (node instanceof FunctionCallNode fc) {
+            checkFunctionCall(fc, false);
+
         } else {
             error(node.line, "R0-ComandoDesconhecido",
                     "Comando não reconhecido pelo analisador semântico: "
@@ -145,6 +177,11 @@ public class SemanticAnalyzer {
             return;
         }
 
+        if (node.isConst && node.initializer == null) {
+            error(node.line, "R9-ConstanteNaoInicializada",
+                    "constante '" + node.name + "' deve ser inicializada na declaração");
+        }
+
         boolean initialized = node.initializer != null;
 
         if (initialized) {
@@ -156,7 +193,7 @@ public class SemanticAnalyzer {
                     && !isAssignmentCompatible(node.type, initType)) {
 
                 error(node.line, "R3-TipoIncompativel",
-                        "não é possível inicializar variável '" + node.name
+                        "não é possível inicializar " + (node.isConst ? "constante '" : "variável '") + node.name
                                 + "' do tipo '" + node.type
                                 + "' com um valor do tipo '" + initType + "'");
             }
@@ -165,10 +202,12 @@ public class SemanticAnalyzer {
         Symbol symbol = new Symbol(
                 node.name,
                 node.type,
-                Category.VARIABLE,
+                node.isConst ? Category.CONSTANT : Category.VARIABLE,
                 symbolTable.currentScopeLevel(),
                 node.line,
-                initialized);
+                initialized,
+                null,
+                node.isConst);
 
         if (node.initializer instanceof NumberNode numNode) {
             symbol.constantValue = numNode.value;
@@ -194,6 +233,14 @@ public class SemanticAnalyzer {
 
             // Ainda assim analisa o lado direito, para reportar
             // outros erros que possam existir na expressão.
+            inferType(node.value);
+            return;
+        }
+
+        // Impedir reatribuição de constante
+        if (symbol.isConstant()) {
+            error(node.line, "R9-ReatribuicaoConstante",
+                    "não é possível reatribuir a constante '" + node.name + "'");
             inferType(node.value);
             return;
         }
@@ -293,26 +340,60 @@ public class SemanticAnalyzer {
     }
 
     private void visitReturn(ReturnNode node) {
-        if (node.value != null) {
-            inferType(node.value);
+        if (currentFunction == null) {
+            error(node.line, "R12-ReturnForaDeFuncao",
+                    "comando 'return' só pode ser usado dentro do corpo de uma função");
+            if (node.value != null) {
+                inferType(node.value);
+            }
+            return;
+        }
+
+        if (currentFunction.returnType.equals("void")) {
+            if (node.value != null) {
+                error(node.line, "R13-RetornoIncompativel",
+                        "função '" + currentFunction.name + "' do tipo 'void' não deve retornar valor");
+                inferType(node.value);
+            }
+        } else {
+            if (node.value == null) {
+                error(node.line, "R13-RetornoIncompativel",
+                        "função '" + currentFunction.name + "' do tipo '" + currentFunction.returnType
+                                + "' deve retornar um valor");
+            } else {
+                String valType = inferType(node.value);
+                if (!valType.equals(TYPE_ERROR) && !isAssignmentCompatible(currentFunction.returnType, valType)) {
+                    error(node.line, "R13-RetornoIncompativel",
+                            "tipo de retorno incompatível na função '" + currentFunction.name + "': esperado '"
+                                    + currentFunction.returnType + "', mas foi retornado '" + valType + "'");
+                }
+            }
         }
     }
 
     private void visitFunction(FunctionNode node) {
-        if (symbolTable.declaredInCurrentScope(node.name)) {
-            error(node.line, "R2-Redeclaracao",
-                    "função '" + node.name + "' já declarada anteriormente neste mesmo escopo");
-            return;
+        // Se a função já foi registrada na pré-passagem global, não redeclara
+        Symbol funcSym = symbolTable.lookup(node.name);
+        if (funcSym == null) {
+            List<String> paramTypes = new ArrayList<>();
+            if (node.parameters != null) {
+                for (DeclarationNode p : node.parameters) {
+                    paramTypes.add(p.type);
+                }
+            }
+            funcSym = new Symbol(
+                    node.name,
+                    node.returnType,
+                    Category.FUNCTION,
+                    symbolTable.currentScopeLevel(),
+                    node.line,
+                    true);
+            funcSym.paramTypes = paramTypes;
+            symbolTable.declare(funcSym);
         }
 
-        Symbol funcSym = new Symbol(
-                node.name,
-                node.returnType,
-                Category.FUNCTION,
-                symbolTable.currentScopeLevel(),
-                node.line,
-                true);
-        symbolTable.declare(funcSym);
+        FunctionNode previousFunction = currentFunction;
+        currentFunction = node;
 
         symbolTable.enterScope();
         if (node.parameters != null) {
@@ -324,10 +405,12 @@ public class SemanticAnalyzer {
                     Symbol paramSym = new Symbol(
                             p.name,
                             p.type,
-                            Category.PARAMETER,
+                            p.isConst ? Category.CONSTANT : Category.PARAMETER,
                             symbolTable.currentScopeLevel(),
                             p.line,
-                            true);
+                            true,
+                            null,
+                            p.isConst);
                     symbolTable.declare(paramSym);
                 }
             }
@@ -339,7 +422,30 @@ public class SemanticAnalyzer {
             }
         }
 
+        if (!node.returnType.equals("void") && !hasAnyReturn(node.body)) {
+            error(node.line, "R14-FuncaoSemRetorno",
+                    "função '" + node.name + "' do tipo '" + node.returnType + "' deve conter comando 'return'");
+        }
+
         symbolTable.exitScope();
+        currentFunction = previousFunction;
+    }
+
+    private boolean hasAnyReturn(Node node) {
+        if (node == null) return false;
+        if (node instanceof ReturnNode) return true;
+        if (node instanceof BlockNode b) {
+            for (Node s : b.statements) {
+                if (hasAnyReturn(s)) return true;
+            }
+        }
+        if (node instanceof IfNode i) {
+            return hasAnyReturn(i.thenBranch) || hasAnyReturn(i.elseBranch);
+        }
+        if (node instanceof WhileNode w) {
+            return hasAnyReturn(w.body);
+        }
+        return false;
     }
 
     /*
@@ -385,6 +491,10 @@ public class SemanticAnalyzer {
             return inferIdentifierType(id);
         }
 
+        if (node instanceof FunctionCallNode fc) {
+            return checkFunctionCall(fc, true);
+        }
+
         if (node instanceof BinOpNode bin) {
             return inferBinOpType(bin);
         }
@@ -405,6 +515,56 @@ public class SemanticAnalyzer {
                         + node.getClass().getSimpleName());
 
         return TYPE_ERROR;
+    }
+
+    private String checkFunctionCall(FunctionCallNode call, boolean isExpressionContext) {
+        Symbol funcSym = symbolTable.lookup(call.name);
+
+        if (funcSym == null) {
+            error(call.line, "R1-FuncaoNaoDeclarada",
+                    "função '" + call.name + "' não foi declarada antes de ser usada");
+            for (Node arg : call.arguments) {
+                inferType(arg);
+            }
+            return TYPE_ERROR;
+        }
+
+        if (funcSym.category != Category.FUNCTION) {
+            error(call.line, "R1-NaoEFuncao",
+                    "identificador '" + call.name + "' não é uma função");
+            for (Node arg : call.arguments) {
+                inferType(arg);
+            }
+            return TYPE_ERROR;
+        }
+
+        int expected = funcSym.paramTypes.size();
+        int actual = call.arguments.size();
+        if (actual != expected) {
+            error(call.line, "R10-AridadeIncorreta",
+                    "função '" + call.name + "' esperava " + expected + " argumento(s), mas recebeu " + actual);
+        }
+
+        int checkCount = Math.min(actual, expected);
+        for (int i = 0; i < actual; i++) {
+            String argType = inferType(call.arguments.get(i));
+            if (i < checkCount) {
+                String expectedType = funcSym.paramTypes.get(i);
+                if (!argType.equals(TYPE_ERROR) && !isAssignmentCompatible(expectedType, argType)) {
+                    error(call.arguments.get(i).line, "R3-TipoIncompativel",
+                            "argumento " + (i + 1) + " da função '" + call.name + "' esperava tipo '"
+                                    + expectedType + "', mas recebeu '" + argType + "'");
+                }
+            }
+        }
+
+        if (isExpressionContext && funcSym.type.equals("void")) {
+            error(call.line, "R11-FuncaoVoidEmExpressao",
+                    "função '" + call.name + "' do tipo 'void' não pode ser usada em expressões");
+            return TYPE_ERROR;
+        }
+
+        return funcSym.type;
     }
 
     private String inferIdentifierType(IdentifierNode id) {

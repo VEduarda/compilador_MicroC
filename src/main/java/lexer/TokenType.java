@@ -10,6 +10,7 @@ public enum TokenType {
     INT,
     FLOAT,
     VOID,
+    CONST,
 
     // Estruturas de controle
     IF,

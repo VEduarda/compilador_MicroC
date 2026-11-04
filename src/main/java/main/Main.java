@@ -18,15 +18,19 @@ import java.util.List;
 /**
  * Ponto de Entrada Principal do Compilador MicroC.
  *
- * Todos os programas de exemplo estão embutidos diretamente no código como texto (Strings multiline),
+ * Todos os programas de exemplo estão embutidos diretamente no código como
+ * texto (Strings multiline),
  * sem dependência de arquivos externos no disco.
  *
  * Cobertura completa dos itens solicitados do PDF:
- *   - Item 2: Descrição do Projeto (Léxico, Sintático, Semântico, TAC e Back-end)
- *   - Item 3: Fluxo Esperado do Compilador (Pipeline de 7 etapas)
- *   - Item 4: Resultado Final Esperado (Execução do programa no Back-end via interpretador TAC)
- *   - Item 5: Otimização de Código (Folding, Propagação, CSE, Simplificação e DCE)
- *   - Tratamento de Erros: Erros Léxicos, Sintáticos e Semânticos identificados com localização e descrição clara.
+ * - Item 2: Descrição do Projeto (Léxico, Sintático, Semântico, TAC e Back-end)
+ * - Item 3: Fluxo Esperado do Compilador (Pipeline de 7 etapas)
+ * - Item 4: Resultado Final Esperado (Execução do programa no Back-end via
+ * interpretador TAC)
+ * - Item 5: Otimização de Código (Folding, Propagação, CSE, Simplificação e
+ * DCE)
+ * - Tratamento de Erros: Erros Léxicos, Sintáticos e Semânticos identificados
+ * com localização e descrição clara.
  */
 public class Main {
 
@@ -36,83 +40,82 @@ public class Main {
 
     /** Exemplo 1: Programa completo com expressões, condicionais e laço while */
     public static final String PROGRAMA_1_COMPLETO = """
-    int x = 2 + 3 * 4;
-    int y = (x + 5) * 2;
-    int sum = 0;
-    int i = 0;
-    while (i < 3) {
-        sum = sum + i;
-        i = i + 1;
-    }
-    if (y > 20) {
-        print(y);
-    } else {
-        print(0);
-    }
-    print(sum);
-    """;
+            int x = 2 + 3 * 4;
+            int y = (x + 5) * 2;
+            int sum = 0;
+            int i = 0;
+            while (i < 3) {
+                sum = sum + i;
+                i = i + 1;
+            }
+            if (y > 20) {
+                print(y);
+            } else {
+                print(0);
+            }
+            print(sum);
+            """;
 
     /** Exemplo 2: Laço de repetição com acumulador somatório */
     public static final String PROGRAMA_2_WHILE = """
-    int i = 0;
-    int sum = 0;
-    while (i < 5) {
-        i = i + 1;
-        sum = sum + i;
-        print(i);
-    }
-    print(sum);
-    """;
+            int i = 0;
+            int sum = 0;
+            while (i < 5) {
+                i = i + 1;
+                sum = sum + i;
+                print(i);
+            }
+            print(sum);
+            """;
 
     /** Exemplo 3: Código do exemplo da Seção 5 do PDF (Otimização) */
     public static final String PROGRAMA_3_PDF_SECAO5 = """
-    int t1;
-    int t2;
-    int t3;
-    int x;
-    t1 = 10 * 2;
-    t2 = t1 + 5;
-    t3 = t2;
-    x = t3;
-    print(x);
-    """;
+            int t1;
+            int t2;
+            int t3;
+            int x;
+            t1 = 10 * 2;
+            t2 = t1 + 5;
+            t3 = t2;
+            x = t3;
+            print(x);
+            """;
 
     /** Exemplo 4: Código da Seção 8 do PDF (Função int main() com return) */
     public static final String PROGRAMA_4_MAIN_SECAO8 = """
-    int main() {
-        int a;
-        a = 10;
-        return a;
-    }
-    """;
+            int main() {
+                int a;
+                a = 10;
+                return a;
+            }
+            """;
 
     /** Exemplo 5: Código para teste de tratamento de ERRO SEMÂNTICO */
     public static final String PROGRAMA_ERRO_SEMANTICO = """
-    int a = 10;
-    int b = "texto incompativel";
-    c = 30;
-    """;
+            int a = 10;
+            int b = "texto incompativel";
+            c = 30;
+            """;
 
     /** Exemplo 6: Código para teste de tratamento de ERRO SINTÁTICO */
     public static final String PROGRAMA_ERRO_SINTATICO = """
-    int x = ;
-    """;
+            int x = ;
+            """;
 
     /** Exemplo 7: Código para teste de tratamento de ERRO LÉXICO */
     public static final String PROGRAMA_ERRO_LEXICO = """
-    int x = 10 @ 5;
-    """;
+            int x = 10 @ 5;
+            """;
 
     // =========================================================================
     // PONTO DE ENTRADA MAIN
     // =========================================================================
 
     public static void main(String[] args) {
-        // Força saída padrão e de erros em UTF-8 para exibição correta de caracteres acentuados
+        // Força saída padrão e de erros em UTF-8 para exibição correta de caracteres
+        // acentuados
         System.setOut(new java.io.PrintStream(System.out, true, java.nio.charset.StandardCharsets.UTF_8));
         System.setErr(new java.io.PrintStream(System.err, true, java.nio.charset.StandardCharsets.UTF_8));
-
-        
 
         System.out.println("================================================================================");
         System.out.println("            COMPILADOR MICROC - DEMONSTRAÇÃO COMPLETA INTEGRADA                 ");
@@ -150,7 +153,8 @@ public class Main {
         runFullPipeline(PROGRAMA_4_MAIN_SECAO8, "Exemplo 4: Seção 8 - int main() com return");
 
         // ---------------------------------------------------------------------
-        // 5. DEMONSTRAÇÃO DETALHADA DO TRATAMENTO DE ERROS (LÉXICOS, SINTÁTICOS E SEMÂNTICOS)
+        // 5. DEMONSTRAÇÃO DETALHADA DO TRATAMENTO DE ERROS (LÉXICOS, SINTÁTICOS E
+        // SEMÂNTICOS)
         // ---------------------------------------------------------------------
         System.out.println("\n================================================================================");
         System.out.println(">>> CENARIO 5: TRATAMENTO DE ERROS (LEXICOS, SINTATICOS E SEMANTICOS)");
@@ -165,6 +169,7 @@ public class Main {
         System.out.println("================================================================================\n");
         OptimizationTestRunner.runTests();
         SDTTestRunner.runAllTests();
+        FeatureValidationRunner.runAllValidationTests();
 
         System.out.println("\n================================================================================");
         System.out.println("       TODAS AS ETAPAS E TRATAMENTOS DE ERRO VALIDADOS COM 100% DE SUCESSO!      ");
@@ -172,7 +177,8 @@ public class Main {
     }
 
     /**
-     * Executa o pipeline de compilação completo para um código-fonte MicroC em texto.
+     * Executa o pipeline de compilação completo para um código-fonte MicroC em
+     * texto.
      */
     public static void runFullPipeline(String code, String programTitle) {
         System.out.println("--------------------------------------------------------------------------------");
@@ -186,7 +192,8 @@ public class Main {
         CompilationResult res = pipeline.compileString(code, programTitle);
 
         // ETAPA 1: ANÁLISE LÉXICA
-        System.out.println("\n--- 1. ANALISE LEXICA (" + res.tokens.size() + " tokens em " + String.format("%.4f", res.lexTimeMs) + " ms) ---");
+        System.out.println("\n--- 1. ANALISE LEXICA (" + res.tokens.size() + " tokens em "
+                + String.format("%.4f", res.lexTimeMs) + " ms) ---");
         for (Token t : res.tokens) {
             System.out.println("   " + t);
         }
@@ -198,7 +205,8 @@ public class Main {
         }
 
         // ETAPA 2: ANÁLISE SINTÁTICA
-        System.out.println("\n--- 2. ANALISE SINTATICA - AST GERADA (Tempo: " + String.format("%.4f", res.parseTimeMs) + " ms) ---");
+        System.out.println("\n--- 2. ANALISE SINTATICA - AST GERADA (Tempo: " + String.format("%.4f", res.parseTimeMs)
+                + " ms) ---");
         if (res.ast != null) {
             res.ast.print("   ");
         }
@@ -210,7 +218,8 @@ public class Main {
         }
 
         // ETAPA 3: ANÁLISE SEMÂNTICA
-        System.out.println("\n--- 3. ANALISE SEMANTICA & TABELA DE SIMBOLOS (Tempo: " + String.format("%.4f", res.semanticTimeMs) + " ms) ---");
+        System.out.println("\n--- 3. ANALISE SEMANTICA & TABELA DE SIMBOLOS (Tempo: "
+                + String.format("%.4f", res.semanticTimeMs) + " ms) ---");
         if (res.symbolTable != null) {
             System.out.println("   NOME         | TIPO     | CATEGORIA   | ESCOPO    | LINHA    | STATUS");
             for (Symbol s : res.symbolTable.getHistory()) {
@@ -219,7 +228,8 @@ public class Main {
         }
 
         if (!res.semanticErrors.isEmpty()) {
-            System.err.println("\n[COMPILACAO INTERROMPIDA POR ERROS SEMANTICOS (" + res.semanticErrors.size() + ")]: ");
+            System.err
+                    .println("\n[COMPILACAO INTERROMPIDA POR ERROS SEMANTICOS (" + res.semanticErrors.size() + ")]: ");
             for (SemanticError err : res.semanticErrors) {
                 System.err.println("   " + err);
             }
@@ -229,7 +239,8 @@ public class Main {
         }
 
         // ETAPA 4: CÓDIGO INTERMEDIÁRIO (TAC / IR)
-        System.out.println("\n--- 4. CODIGO INTERMEDIARIO GERADO (TAC / IR) (Tempo: " + String.format("%.4f", res.tacTimeMs) + " ms) ---");
+        System.out.println("\n--- 4. CODIGO INTERMEDIARIO GERADO (TAC / IR) (Tempo: "
+                + String.format("%.4f", res.tacTimeMs) + " ms) ---");
         for (String inst : res.rawTAC) {
             System.out.println("   " + inst);
         }
@@ -244,20 +255,26 @@ public class Main {
             res.executionResult.printSummary();
         }
 
-        // VALIDAÇÃO DA PRESERVAÇÃO SEMÂNTICA (EXECUÇÃO COMPARATIVA ORIGINAL VS OTIMIZADO)
+        // VALIDAÇÃO DA PRESERVAÇÃO SEMÂNTICA (EXECUÇÃO COMPARATIVA ORIGINAL VS
+        // OTIMIZADO)
         System.out.println("--- VALIDACAO DE PRESERVACAO SEMANTICA (ITEM 5 DO ENUNCIADO) ---");
         TACInterpreter quietInterp = new TACInterpreter(false);
         ExecutionResult execRaw = quietInterp.execute(res.rawTAC);
         ExecutionResult execOpt = quietInterp.execute(res.optimizedTAC);
 
         boolean outputMatch = execRaw.getOutput().equals(execOpt.getOutput());
-        System.out.println("Saída do TAC Original  : " + (execRaw.getOutput().isEmpty() ? "(vazio)" : execRaw.getOutput()));
-        System.out.println("Saída do TAC Otimizado : " + (execOpt.getOutput().isEmpty() ? "(vazio)" : execOpt.getOutput()));
-        System.out.println("Comportamento Idêntico : " + (outputMatch ? "[SIM - Semântica Preservada]" : "[NÃO - Divergência Detectada]"));
-        System.out.printf("Instruções Executadas  : Original = %d ciclos | Otimizado = %d ciclos (Economia de %.1f%%)%n%n",
+        System.out.println(
+                "Saída do TAC Original  : " + (execRaw.getOutput().isEmpty() ? "(vazio)" : execRaw.getOutput()));
+        System.out.println(
+                "Saída do TAC Otimizado : " + (execOpt.getOutput().isEmpty() ? "(vazio)" : execOpt.getOutput()));
+        System.out.println("Comportamento Idêntico : "
+                + (outputMatch ? "[SIM - Semântica Preservada]" : "[NÃO - Divergência Detectada]"));
+        System.out.printf(
+                "Instruções Executadas  : Original = %d ciclos | Otimizado = %d ciclos (Economia de %.1f%%)%n%n",
                 execRaw.getInstructionsExecuted(), execOpt.getInstructionsExecuted(),
-                execRaw.getInstructionsExecuted() > 0 
-                        ? ((execRaw.getInstructionsExecuted() - execOpt.getInstructionsExecuted()) * 100.0 / execRaw.getInstructionsExecuted())
+                execRaw.getInstructionsExecuted() > 0
+                        ? ((execRaw.getInstructionsExecuted() - execOpt.getInstructionsExecuted()) * 100.0
+                                / execRaw.getInstructionsExecuted())
                         : 0.0);
     }
 
@@ -269,8 +286,7 @@ public class Main {
                 "t1 = 10 * 2",
                 "t2 = t1 + 5",
                 "t3 = t2",
-                "x = t3"
-        );
+                "x = t3");
 
         System.out.println("\nCódigo intermediário antes da otimização (conforme o PDF):");
         for (String s : rawPdfExample) {
@@ -304,7 +320,8 @@ public class Main {
     }
 
     /**
-     * Demonstra detalhadamente o tratamento de erros léxicos, sintáticos e semânticos.
+     * Demonstra detalhadamente o tratamento de erros léxicos, sintáticos e
+     * semânticos.
      */
     private static void demonstrateErrorHandling() {
         CompilerPipeline pipeline = new CompilerPipeline();

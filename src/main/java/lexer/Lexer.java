@@ -49,10 +49,10 @@ public class Lexer {
      */
     public Lexer(String input) {
         this.input = input;
-        this.pos   = 0;
-        this.line  = 1;
+        this.pos = 0;
+        this.line = 1;
 
-        keywords  = new HashMap<>();
+        keywords = new HashMap<>();
         operators = new HashMap<>();
 
         initializeKeywords();
@@ -65,16 +65,17 @@ public class Lexer {
      * como palavra reservada em vez de ID.
      */
     private void initializeKeywords() {
-        keywords.put("int",      TokenType.INT);
-        keywords.put("float",    TokenType.FLOAT);
-        keywords.put("void",     TokenType.VOID);
-        keywords.put("if",       TokenType.IF);
-        keywords.put("else",     TokenType.ELSE);
-        keywords.put("while",    TokenType.WHILE);
-        keywords.put("break",    TokenType.BREAK);
+        keywords.put("int", TokenType.INT);
+        keywords.put("float", TokenType.FLOAT);
+        keywords.put("void", TokenType.VOID);
+        keywords.put("const", TokenType.CONST);
+        keywords.put("if", TokenType.IF);
+        keywords.put("else", TokenType.ELSE);
+        keywords.put("while", TokenType.WHILE);
+        keywords.put("break", TokenType.BREAK);
         keywords.put("continue", TokenType.CONTINUE);
-        keywords.put("return",   TokenType.RETURN);
-        keywords.put("print",    TokenType.PRINT);
+        keywords.put("return", TokenType.RETURN);
+        keywords.put("print", TokenType.PRINT);
     }
 
     /*
@@ -83,15 +84,15 @@ public class Lexer {
      * antes dos de um caractere para evitar conflito.
      */
     private void initializeOperators() {
-        operators.put("=",  TokenType.ASSIGN);
+        operators.put("=", TokenType.ASSIGN);
         operators.put("==", TokenType.EQUAL);
         operators.put("!=", TokenType.NOT_EQUAL);
-        operators.put("+",  TokenType.PLUS);
-        operators.put("-",  TokenType.MINUS);
-        operators.put("*",  TokenType.MULT);
-        operators.put("/",  TokenType.DIV);
-        operators.put("<",  TokenType.LT);
-        operators.put(">",  TokenType.GT);
+        operators.put("+", TokenType.PLUS);
+        operators.put("-", TokenType.MINUS);
+        operators.put("*", TokenType.MULT);
+        operators.put("/", TokenType.DIV);
+        operators.put("<", TokenType.LT);
+        operators.put(">", TokenType.GT);
         operators.put("<=", TokenType.LTE);
         operators.put(">=", TokenType.GTE);
         operators.put("&&", TokenType.AND);
@@ -104,7 +105,8 @@ public class Lexer {
      * Retorna o caractere nulo '\0' se chegou ao fim do texto.
      */
     private char peek() {
-        if (pos >= input.length()) return '\0';
+        if (pos >= input.length())
+            return '\0';
         return input.charAt(pos);
     }
 
@@ -114,7 +116,8 @@ public class Lexer {
      * de dois caracteres como == e <=.
      */
     private char peekNext() {
-        if (pos + 1 >= input.length()) return '\0';
+        if (pos + 1 >= input.length())
+            return '\0';
         return input.charAt(pos + 1);
     }
 
@@ -124,7 +127,8 @@ public class Lexer {
      */
     private char next() {
         char current = peek();
-        if (current != '\0') pos++;
+        if (current != '\0')
+            pos++;
         return current;
     }
 
@@ -135,7 +139,8 @@ public class Lexer {
      */
     private void skipWhitespace() {
         while (Character.isWhitespace(peek())) {
-            if (peek() == '\n') line++;
+            if (peek() == '\n')
+                line++;
             next();
         }
     }
@@ -145,25 +150,29 @@ public class Lexer {
      *
      * Comentario de linha: comeca com // e vai ate o fim da linha.
      * Comentario de bloco: comeca com /* e termina com asterisco barra.
-     *   Se o bloco nao for fechado, lanca um erro lexico.
+     * Se o bloco nao for fechado, lanca um erro lexico.
      */
     private void skipComment() {
 
         // Comentario de linha
         if (peek() == '/' && peekNext() == '/') {
-            while (peek() != '\n' && peek() != '\0') next();
+            while (peek() != '\n' && peek() != '\0')
+                next();
 
-        // Comentario de bloco
+            // Comentario de bloco
         } else if (peek() == '/' && peekNext() == '*') {
-            next(); next(); // consome /*
+            next();
+            next(); // consome /*
 
             while (!(peek() == '*' && peekNext() == '/')) {
                 if (peek() == '\0')
                     throw new LexicalError(line, "comentário de bloco não fechado");
-                if (peek() == '\n') line++;
+                if (peek() == '\n')
+                    line++;
                 next();
             }
-            next(); next(); // consome */
+            next();
+            next(); // consome */
         }
     }
 
@@ -172,14 +181,16 @@ public class Lexer {
      */
     private Token scanNumber() {
         StringBuilder buffer = new StringBuilder();
-        while (Character.isDigit(peek())) buffer.append(next());
+        while (Character.isDigit(peek()))
+            buffer.append(next());
 
         if (peek() == '.') {
             buffer.append(next());
             if (!Character.isDigit(peek())) {
                 throw new LexicalError(line, "literal decimal deve ter dígitos após o ponto");
             }
-            while (Character.isDigit(peek())) buffer.append(next());
+            while (Character.isDigit(peek()))
+                buffer.append(next());
         }
 
         return new Token(TokenType.NUMBER, buffer.toString(), line);
@@ -214,7 +225,8 @@ public class Lexer {
         next(); // consome a aspa de abertura
 
         while (peek() != '"' && peek() != '\0') {
-            if (peek() == '\n') line++;
+            if (peek() == '\n')
+                line++;
             buffer.append(next());
         }
 
@@ -234,7 +246,8 @@ public class Lexer {
     private Token scanOperator() {
         String twoChars = "" + peek() + peekNext();
         if (operators.containsKey(twoChars)) {
-            next(); next();
+            next();
+            next();
             return new Token(operators.get(twoChars), twoChars, line);
         }
 
@@ -252,12 +265,12 @@ public class Lexer {
      *
      * O metodo primeiro ignora espacos e comentarios,
      * depois tenta reconhecer o proximo token na seguinte ordem:
-     *   1. Fim de arquivo
-     *   2. String
-     *   3. Numero
-     *   4. Identificador ou palavra reservada
-     *   5. Operador
-     *   6. Delimitador
+     * 1. Fim de arquivo
+     * 2. String
+     * 3. Numero
+     * 4. Identificador ou palavra reservada
+     * 5. Operador
+     * 6. Delimitador
      *
      * Se nenhum padrao for reconhecido, lanca um erro lexico
      * indicando o caractere invalido e a linha onde ocorreu.
@@ -292,17 +305,24 @@ public class Lexer {
 
         // Operador
         Token opToken = scanOperator();
-        if (opToken != null) return opToken;
+        if (opToken != null)
+            return opToken;
 
         // Delimitadores
         char c = next();
         switch (c) {
-            case '(': return new Token(TokenType.LPAREN,    "(", line);
-            case ')': return new Token(TokenType.RPAREN,    ")", line);
-            case '{': return new Token(TokenType.LBRACE,    "{", line);
-            case '}': return new Token(TokenType.RBRACE,    "}", line);
-            case ',': return new Token(TokenType.COMMA,     ",", line);
-            case ';': return new Token(TokenType.SEMICOLON, ";", line);
+            case '(':
+                return new Token(TokenType.LPAREN, "(", line);
+            case ')':
+                return new Token(TokenType.RPAREN, ")", line);
+            case '{':
+                return new Token(TokenType.LBRACE, "{", line);
+            case '}':
+                return new Token(TokenType.RBRACE, "}", line);
+            case ',':
+                return new Token(TokenType.COMMA, ",", line);
+            case ';':
+                return new Token(TokenType.SEMICOLON, ";", line);
             default:
                 throw new LexicalError(line, "caractere inválido ou não reconhecido: '" + c + "'");
         }

@@ -29,6 +29,9 @@ public class TACInstruction {
         IF_TRUE,       // ifTrue cond goto label
         PRINT,         // print op1
         RETURN,        // return [op1]
+        PARAM,         // param op1
+        CALL,          // [dest =] call op1, op2
+        ARG,           // arg op1
         COMMENT        // // comentario
     }
 
@@ -121,11 +124,55 @@ public class TACInstruction {
             return inst;
         }
 
+        // Instrução param: "param <expr>"
+        if (code.startsWith("param ")) {
+            inst.kind = Kind.PARAM;
+            inst.op1 = code.substring(6).trim();
+            return inst;
+        }
+
+        // Instrução arg: "arg <id>"
+        if (code.startsWith("arg ")) {
+            inst.kind = Kind.ARG;
+            inst.op1 = code.substring(4).trim();
+            return inst;
+        }
+
+        // Instrução call isolada (comando): "call <func>, <n>"
+        if (code.startsWith("call ")) {
+            inst.kind = Kind.CALL;
+            String rest = code.substring(5).trim();
+            int cIdx = rest.indexOf(',');
+            if (cIdx != -1) {
+                inst.op1 = rest.substring(0, cIdx).trim();
+                inst.op2 = rest.substring(cIdx + 1).trim();
+            } else {
+                inst.op1 = rest;
+                inst.op2 = "0";
+            }
+            return inst;
+        }
+
         // Atribuições: "dest = ..."
         int eqIdx = code.indexOf('=');
         if (eqIdx != -1) {
             inst.dest = code.substring(0, eqIdx).trim();
             String rhs = code.substring(eqIdx + 1).trim();
+
+            // Chamada de função com retorno atribuído: "dest = call <func>, <n>"
+            if (rhs.startsWith("call ")) {
+                inst.kind = Kind.CALL;
+                String rest = rhs.substring(5).trim();
+                int cIdx = rest.indexOf(',');
+                if (cIdx != -1) {
+                    inst.op1 = rest.substring(0, cIdx).trim();
+                    inst.op2 = rest.substring(cIdx + 1).trim();
+                } else {
+                    inst.op1 = rest;
+                    inst.op2 = "0";
+                }
+                return inst;
+            }
 
             // Verifica operadores binários conhecidos: +, -, *, /, ==, !=, <=, >=, <, >, &&, ||
             String[] binOps = {"==", "!=", "<=", ">=", "&&", "||", "+", "-", "*", "/", "<", ">"};
@@ -183,6 +230,9 @@ public class TACInstruction {
             case IF_TRUE -> "ifTrue " + op1 + " goto " + label;
             case PRINT -> "print " + op1;
             case RETURN -> (op1 != null && !op1.isEmpty()) ? ("return " + op1) : "return";
+            case PARAM -> "param " + op1;
+            case ARG -> "arg " + op1;
+            case CALL -> (dest != null ? dest + " = call " : "call ") + op1 + ", " + (op2 != null ? op2 : "0");
             case ASSIGN_COPY -> dest + " = " + op1;
             case ASSIGN_UNARY -> dest + " = " + op + " " + op1;
             case ASSIGN_BIN -> dest + " = " + op1 + " " + op + " " + op2;
@@ -197,6 +247,12 @@ public class TACInstruction {
         if (kind == Kind.ASSIGN_BIN || kind == Kind.ASSIGN_UNARY || kind == Kind.ASSIGN_COPY) {
             return dest;
         }
+        if (kind == Kind.CALL) {
+            return dest;
+        }
+        if (kind == Kind.ARG) {
+            return op1;
+        }
         return null;
     }
 
@@ -210,7 +266,7 @@ public class TACInstruction {
                 if (isVariable(op1)) uses.add(op1);
                 if (isVariable(op2)) uses.add(op2);
             }
-            case ASSIGN_UNARY, ASSIGN_COPY, PRINT, RETURN, IF_FALSE, IF_TRUE -> {
+            case ASSIGN_UNARY, ASSIGN_COPY, PRINT, RETURN, IF_FALSE, IF_TRUE, PARAM -> {
                 if (op1 != null && isVariable(op1)) uses.add(op1);
             }
             default -> {}

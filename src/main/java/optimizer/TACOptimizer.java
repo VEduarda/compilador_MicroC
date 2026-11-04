@@ -111,7 +111,8 @@ public class TACOptimizer {
 
             // Rótulo ou salto invalida o contexto de fluxo sequencial estrito
             if (inst.kind == Kind.LABEL || inst.kind == Kind.GOTO 
-                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE) {
+                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE
+                    || inst.kind == Kind.CALL) {
                 constMap.clear();
                 continue;
             }
@@ -138,7 +139,8 @@ public class TACOptimizer {
                 }
             } else if (inst.kind == Kind.ASSIGN_UNARY || inst.kind == Kind.ASSIGN_COPY 
                     || inst.kind == Kind.PRINT || inst.kind == Kind.RETURN
-                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE) {
+                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE
+                    || inst.kind == Kind.PARAM) {
                 if (inst.op1 != null && constMap.containsKey(inst.op1)) {
                     String oldVal = inst.op1;
                     inst.op1 = constMap.get(inst.op1);
@@ -337,7 +339,8 @@ public class TACOptimizer {
         for (TACInstruction inst : program) {
             // Limites de blocos básicos invalidam o mapeamento
             if (inst.kind == Kind.LABEL || inst.kind == Kind.GOTO 
-                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE) {
+                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE
+                    || inst.kind == Kind.CALL) {
                 exprMap.clear();
                 continue;
             }
@@ -384,7 +387,8 @@ public class TACOptimizer {
 
         for (TACInstruction inst : program) {
             if (inst.kind == Kind.LABEL || inst.kind == Kind.GOTO 
-                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE) {
+                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE
+                    || inst.kind == Kind.CALL) {
                 copyMap.clear();
                 continue;
             }
@@ -410,7 +414,8 @@ public class TACOptimizer {
                 }
             } else if (inst.kind == Kind.ASSIGN_UNARY || inst.kind == Kind.ASSIGN_COPY 
                     || inst.kind == Kind.PRINT || inst.kind == Kind.RETURN
-                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE) {
+                    || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE
+                    || inst.kind == Kind.PARAM) {
                 if (inst.op1 != null && copyMap.containsKey(inst.op1)) {
                     String oldVal = inst.op1;
                     inst.op1 = copyMap.get(inst.op1);
@@ -581,6 +586,9 @@ public class TACOptimizer {
         for (TACInstruction inst : program) {
             if (inst.kind == Kind.GOTO || inst.kind == Kind.IF_FALSE || inst.kind == Kind.IF_TRUE) {
                 if (inst.label != null) targetedLabels.add(inst.label);
+            }
+            if (inst.kind == Kind.CALL && inst.op1 != null) {
+                targetedLabels.add(inst.op1);
             }
         }
 

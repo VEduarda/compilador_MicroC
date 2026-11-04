@@ -3,7 +3,8 @@ package ast;
 import ast.Nodes.*;
 
 /**
- * Interface do padrão de projeto Visitor para percurso desacoplado da AST do MicroC.
+ * Interface do padrão de projeto Visitor para percurso desacoplado da AST do
+ * MicroC.
  *
  * Permite implementar múltiplos percursos e tradutores independentes
  * (RPN, TAC, Pretty-Printer, etc.) sem modificar as classes concretas dos nós.
@@ -38,14 +39,21 @@ public interface ASTVisitor {
 
     void visit(StringNode node);
 
-    default void visit(UnaryOpNode node) {}
+    default void visit(UnaryOpNode node) {
+    }
 
-    default void visit(ReturnNode node) {}
+    default void visit(ReturnNode node) {
+    }
 
-    default void visit(FunctionNode node) {}
+    default void visit(FunctionNode node) {
+    }
+
+    default void visit(FunctionCallNode node) {
+    }
 
     /**
-     * Ponto de entrada utilitário para despacho polimórfico a partir de nó genérico.
+     * Ponto de entrada utilitário para despacho polimórfico a partir de nó
+     * genérico.
      */
     default void visit(Node node) {
         if (node != null) {

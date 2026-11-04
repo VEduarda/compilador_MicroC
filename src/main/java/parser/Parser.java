@@ -59,6 +59,9 @@ public class Parser {
      */
     private Node parseStatement() {
 
+        if (match(TokenType.CONST))
+            return parseConstDeclaration();
+
         if (match(TokenType.INT, TokenType.FLOAT, TokenType.VOID))
             return parseDeclarationOrFunction();
 
@@ -80,11 +83,52 @@ public class Parser {
         if (match(TokenType.RETURN))
             return parseReturn();
 
-        if (check(TokenType.ID))
+        if (check(TokenType.ID)) {
+            if (current + 1 < tokens.size() && tokens.get(current + 1).type == TokenType.LPAREN) {
+                return parseFunctionCallStatement();
+            }
             return parseAssignment();
+        }
 
         throw error(
                 "Comando inválido");
+    }
+
+    /*
+     * Analisa uma declaração de constante.
+     * Exemplo: const int MAX = 100;
+     */
+    private Node parseConstDeclaration() {
+        Token typeTok = consume(TokenType.INT, TokenType.FLOAT);
+        Token id = consume(TokenType.ID);
+        Node initializer = null;
+        if (match(TokenType.ASSIGN)) {
+            initializer = parseExpression();
+        }
+        consume(TokenType.SEMICOLON);
+        return new DeclarationNode(
+                typeTok.lexeme,
+                id.lexeme,
+                initializer,
+                true).at(id.line);
+    }
+
+    /*
+     * Analisa uma chamada de função como comando.
+     * Exemplo: executa(10, 20);
+     */
+    private Node parseFunctionCallStatement() {
+        Token id = consume(TokenType.ID);
+        consume(TokenType.LPAREN);
+        List<Node> args = new ArrayList<>();
+        if (!check(TokenType.RPAREN)) {
+            do {
+                args.add(parseExpression());
+            } while (match(TokenType.COMMA));
+        }
+        consume(TokenType.RPAREN);
+        consume(TokenType.SEMICOLON);
+        return new FunctionCallNode(id.lexeme, args).at(id.line);
     }
 
     /*
@@ -105,9 +149,10 @@ public class Parser {
             List<DeclarationNode> params = new ArrayList<>();
             if (!check(TokenType.RPAREN)) {
                 do {
+                    boolean isConst = match(TokenType.CONST);
                     Token paramType = consume(TokenType.INT, TokenType.FLOAT);
                     Token paramId = consume(TokenType.ID);
-                    DeclarationNode decl = new DeclarationNode(paramType.lexeme, paramId.lexeme, null);
+                    DeclarationNode decl = new DeclarationNode(paramType.lexeme, paramId.lexeme, null, isConst);
                     decl.at(paramId.line);
                     params.add(decl);
                 } while (match(TokenType.COMMA));
@@ -420,9 +465,21 @@ public class Parser {
             return new StringNode(
                     previous().lexeme).at(previous().line);
 
-        if (match(TokenType.ID))
+        if (match(TokenType.ID)) {
+            Token id = previous();
+            if (match(TokenType.LPAREN)) {
+                List<Node> args = new ArrayList<>();
+                if (!check(TokenType.RPAREN)) {
+                    do {
+                        args.add(parseExpression());
+                    } while (match(TokenType.COMMA));
+                }
+                consume(TokenType.RPAREN);
+                return new FunctionCallNode(id.lexeme, args).at(id.line);
+            }
             return new IdentifierNode(
-                    previous().lexeme).at(previous().line);
+                    id.lexeme).at(id.line);
+        }
 
         if (match(TokenType.LPAREN)) {
 

@@ -52,6 +52,15 @@ public class PrettyPrinter implements ASTVisitor {
             return id.name;
         } else if (expr instanceof StringNode s) {
             return "\"" + s.value + "\"";
+        } else if (expr instanceof FunctionCallNode call) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(call.name).append("(");
+            for (int i = 0; i < call.arguments.size(); i++) {
+                sb.append(formatExpression(call.arguments.get(i)));
+                if (i < call.arguments.size() - 1) sb.append(", ");
+            }
+            sb.append(")");
+            return sb.toString();
         }
         return expr.getClass().getSimpleName();
     }
@@ -82,7 +91,11 @@ public class PrettyPrinter implements ASTVisitor {
 
     @Override
     public void visit(DeclarationNode node) {
-        output.append(getIndent()).append(node.type).append(" ").append(node.name);
+        output.append(getIndent());
+        if (node.isConst) {
+            output.append("const ");
+        }
+        output.append(node.type).append(" ").append(node.name);
         if (node.initializer != null) {
             output.append(" = ").append(formatExpression(node.initializer));
         }
@@ -151,6 +164,9 @@ public class PrettyPrinter implements ASTVisitor {
         if (node.parameters != null && !node.parameters.isEmpty()) {
             for (int i = 0; i < node.parameters.size(); i++) {
                 DeclarationNode p = node.parameters.get(i);
+                if (p.isConst) {
+                    output.append("const ");
+                }
                 output.append(p.type).append(" ").append(p.name);
                 if (i < node.parameters.size() - 1) {
                     output.append(", ");
@@ -162,6 +178,11 @@ public class PrettyPrinter implements ASTVisitor {
         formatBranchBody(node.body);
         indentLevel--;
         output.append(getIndent()).append("}\n");
+    }
+
+    @Override
+    public void visit(FunctionCallNode node) {
+        output.append(getIndent()).append(formatExpression(node)).append(";\n");
     }
 
     @Override

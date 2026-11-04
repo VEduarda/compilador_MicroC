@@ -509,13 +509,56 @@ public class TACTranslator implements ASTVisitor {
         if (node.parameters != null) {
             for (DeclarationNode parameter : node.parameters) {
                 typeScopes.peek().put(parameter.name, parameter.type);
+                emit("arg " + parameter.name, "Parâmetro formal '" + parameter.name + "' da função '" + node.name + "'");
             }
         }
         if (node.body != null) {
             node.body.accept(this);
         }
+        if ("void".equals(node.returnType)) {
+            if (instructions.isEmpty() || !instructions.get(instructions.size() - 1).startsWith("return")) {
+                emit("return", "Retorno implícito da função void '" + node.name + "'");
+            }
+        }
         typeScopes.pop();
         actionLog.add("[visit FunctionNode] Fim da função '" + node.name + "'");
+    }
+
+    @Override
+    public void visit(FunctionCallNode node) {
+        actionLog.add("[visit FunctionCallNode] Chamada de função '" + node.name + "' com "
+                + (node.arguments != null ? node.arguments.size() : 0) + " argumentos");
+
+        List<String> argPlaces = new ArrayList<>();
+        if (node.arguments != null) {
+            for (Node arg : node.arguments) {
+                arg.accept(this);
+                argPlaces.add(lastPlace);
+            }
+        }
+
+        for (String place : argPlaces) {
+            emit("param " + place, "Passagem de argumento para '" + node.name + "'");
+            releaseTemp(place);
+        }
+
+        int argCount = argPlaces.size();
+        boolean isVoid = false;
+        if (symbolTable != null) {
+            Symbol sym = symbolTable.lookup(node.name);
+            if (sym != null && "void".equals(sym.type)) {
+                isVoid = true;
+            }
+        }
+
+        if (isVoid) {
+            emit("call " + node.name + ", " + argCount, "Chamada de função void");
+            lastPlace = "";
+        } else {
+            String temp = newTemp();
+            emit(temp + " = call " + node.name + ", " + argCount, "Chamada de função com retorno");
+            lastPlace = temp;
+        }
     }
 
     private String convertToFloat(String value) {

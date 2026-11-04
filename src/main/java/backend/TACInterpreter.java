@@ -33,6 +33,20 @@ public class TACInterpreter {
         this.maxCycles = maxCycles;
     }
 
+    private static class CallFrame {
+        final int returnPc;
+        final String destVar;
+        final Map<String, Object> localMemory;
+        final List<Object> pendingArgs;
+
+        CallFrame(int returnPc, String destVar, Map<String, Object> localMemory, List<Object> pendingArgs) {
+            this.returnPc = returnPc;
+            this.destVar = destVar;
+            this.localMemory = localMemory;
+            this.pendingArgs = pendingArgs;
+        }
+    }
+
     /**
      * Executa uma sequência de instruções TAC lineares e retorna o resultado da execução.
      */
@@ -57,24 +71,52 @@ public class TACInterpreter {
             }
         }
 
-        // 2. Estado de execução: memória de variáveis e ponteiro de instrução (PC)
+        // 2. Estado de execução: memória de variáveis, ponteiro de instrução (PC) e pilha de chamadas
         Map<String, Object> memory = new HashMap<>();
+        Map<String, Object> sharedGlobals = new HashMap<>();
+        Deque<CallFrame> callStack = new ArrayDeque<>();
+        List<Object> currentPendingArgs = new ArrayList<>();
+        List<Object> incomingArgs = new ArrayList<>();
         int pc = 0;
         int cycles = 0;
 
-        // Se houver um rótulo "main", inicia a execução a partir dele, caso contrário do início
+        boolean preambleActive = false;
+        // Se houver um rótulo "main", inicia a partir de inicializações globais (se houver) e depois salta para "main"
         if (labelMap.containsKey("main")) {
-            pc = labelMap.get("main");
+            int mainPc = labelMap.get("main");
+            int firstLabel = program.size();
+            for (int i = 0; i < program.size(); i++) {
+                if (program.get(i).kind == Kind.LABEL) {
+                    firstLabel = i;
+                    break;
+                }
+            }
+            if (firstLabel > 0) {
+                pc = 0;
+                preambleActive = true;
+            } else {
+                pc = mainPc;
+            }
         }
 
         while (pc >= 0 && pc < program.size()) {
+            TACInstruction inst = program.get(pc);
+
+            // Se ainda estiver no preâmbulo global antes de 'main' e encontrar o primeiro rótulo, salta para 'main'
+            if (preambleActive && inst.kind == Kind.LABEL) {
+                preambleActive = false;
+                pc = labelMap.get("main");
+                if (pc >= program.size()) {
+                    break;
+                }
+                inst = program.get(pc);
+            }
+
             cycles++;
             if (cycles > maxCycles) {
                 throw new RuntimeException("Limite de ciclos de execução excedido (" + maxCycles 
                         + "). Possível laço infinito no código interpretado!");
             }
-
-            TACInstruction inst = program.get(pc);
 
             switch (inst.kind) {
                 case LABEL, COMMENT -> {
@@ -125,21 +167,71 @@ public class TACInterpreter {
                     pc++;
                 }
 
+                case PARAM -> {
+                    Object val = resolveValue(inst.op1, memory);
+                    currentPendingArgs.add(val);
+                    pc++;
+                }
+
+                case ARG -> {
+                    String paramName = inst.op1;
+                    Object val = (!incomingArgs.isEmpty()) ? incomingArgs.remove(0) : 0;
+                    memory.put(paramName, val);
+                    result.setVariable(paramName, val);
+                    pc++;
+                }
+
+                case CALL -> {
+                    String func = inst.op1;
+                    if (!labelMap.containsKey(func)) {
+                        throw new RuntimeException("Erro em tempo de execução: função não encontrada: " + func);
+                    }
+                    CallFrame frame = new CallFrame(pc + 1, inst.dest, memory, incomingArgs);
+                    callStack.push(frame);
+                    incomingArgs = new ArrayList<>(currentPendingArgs);
+                    currentPendingArgs.clear();
+                    memory = new HashMap<>(memory);
+                    pc = labelMap.get(func);
+                }
+
                 case RETURN -> {
+                    Object retVal = null;
                     if (inst.op1 != null && !inst.op1.isEmpty()) {
-                        Object val = resolveValue(inst.op1, memory);
-                        if (val instanceof Number num) {
+                        retVal = resolveValue(inst.op1, memory);
+                    }
+                    if (!callStack.isEmpty()) {
+                        CallFrame frame = callStack.pop();
+                        // Propaga alterações de variáveis globais compartilhadas
+                        for (Map.Entry<String, Object> e : memory.entrySet()) {
+                            if (sharedGlobals.containsKey(e.getKey())) {
+                                sharedGlobals.put(e.getKey(), e.getValue());
+                                frame.localMemory.put(e.getKey(), e.getValue());
+                            }
+                        }
+                        memory = frame.localMemory;
+                        incomingArgs = frame.pendingArgs;
+                        if (frame.destVar != null) {
+                            Object finalRet = (retVal != null) ? retVal : 0;
+                            memory.put(frame.destVar, finalRet);
+                            result.setVariable(frame.destVar, finalRet);
+                        }
+                        pc = frame.returnPc;
+                    } else {
+                        if (retVal instanceof Number num) {
                             result.setReturnValue(num.intValue());
                         }
+                        // Retorno na base encerra a execução do programa
+                        pc = program.size();
                     }
-                    // Retorno encerra a execução do programa
-                    pc = program.size();
                 }
 
                 case ASSIGN_COPY -> {
                     Object val = resolveValue(inst.op1, memory);
                     memory.put(inst.dest, val);
                     result.setVariable(inst.dest, val);
+                    if (callStack.isEmpty() && !TACInstruction.isTemporary(inst.dest)) {
+                        sharedGlobals.put(inst.dest, val);
+                    }
                     pc++;
                 }
 
@@ -156,6 +248,9 @@ public class TACInterpreter {
                     };
                     memory.put(inst.dest, res);
                     result.setVariable(inst.dest, res);
+                    if (callStack.isEmpty() && !TACInstruction.isTemporary(inst.dest)) {
+                        sharedGlobals.put(inst.dest, res);
+                    }
                     pc++;
                 }
 
@@ -173,8 +268,29 @@ public class TACInterpreter {
 
                     memory.put(inst.dest, res);
                     result.setVariable(inst.dest, res);
+                    if (callStack.isEmpty() && !TACInstruction.isTemporary(inst.dest)) {
+                        sharedGlobals.put(inst.dest, res);
+                    }
                     pc++;
                 }
+            }
+
+            // Se atingir o fim das instruções dentro de uma chamada de função sem return explícito, retorna ao chamador
+            if (pc >= program.size() && !callStack.isEmpty()) {
+                CallFrame frame = callStack.pop();
+                for (Map.Entry<String, Object> e : memory.entrySet()) {
+                    if (sharedGlobals.containsKey(e.getKey())) {
+                        sharedGlobals.put(e.getKey(), e.getValue());
+                        frame.localMemory.put(e.getKey(), e.getValue());
+                    }
+                }
+                memory = frame.localMemory;
+                incomingArgs = frame.pendingArgs;
+                if (frame.destVar != null) {
+                    memory.put(frame.destVar, 0);
+                    result.setVariable(frame.destVar, 0);
+                }
+                pc = frame.returnPc;
             }
         }
 
