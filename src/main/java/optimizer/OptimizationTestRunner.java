@@ -9,8 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Bateria de Testes e Demonstrações da Otimização (Item 5) e Execução Back-End
- * (Item 4).
+ * Bateria de Testes e Demonstrações da Otimização (Item 5) e Execução Back-End (Item 4).
  */
 public class OptimizationTestRunner {
 
@@ -62,23 +61,13 @@ public class OptimizationTestRunner {
         // ---------------------------------------------------------------------
         // TESTE 1: Exemplo Exato da Seção 5 do PDF
         // Antes:
-        // t1 = 10 * 2
-        // t2 = t1 + 5
-        // t3 = t2
-        // x = t3
+        //   t1 = 10 * 2
+        //   t2 = t1 + 5
+        //   t3 = t2
+        //   x = t3
         // Depois:
-        // x = 25
+        //   x = 25
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("--- TESTE 1: Exemplo Exato da Seção 5 do PDF (Dobramento, Propagação e DCE) ---");
-        List<String> rawPdfExample = List.of(
-                "t1 = 10 * 2",
-                "t2 = t1 + 5",
-                "t3 = t2",
-                "x = t3");
-        TACOptimizer opt1 = new TACOptimizer();
-        List<String> optPdfResult = opt1.optimize(rawPdfExample);
-=======
         try {
             System.out.println("--- TESTE 1: Exemplo Exato da Seção 5 do PDF (Dobramento, Propagação e DCE) ---");
             List<String> rawPdfExample = List.of(
@@ -89,7 +78,6 @@ public class OptimizationTestRunner {
             );
             TACOptimizer opt1 = new TACOptimizer();
             List<String> optPdfResult = opt1.optimize(rawPdfExample);
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
             check(optPdfResult.size() == 1, "Exemplo do PDF reduzido a exatamente 1 instrução");
             check(optPdfResult.contains("x = 25"), "Instrução final gerada é exatamente 'x = 25'");
@@ -99,35 +87,16 @@ public class OptimizationTestRunner {
             ExecutionResult resRaw = interp.execute(rawPdfExample);
             ExecutionResult resOpt = interp.execute(optPdfResult);
 
-<<<<<<< HEAD
-        check(resRaw.getVariable("x").equals(25), "Execução do TAC original resulta em x = 25");
-        check(resOpt.getVariable("x").equals(25), "Execução do TAC otimizado resulta em x = 25");
-        check(resRaw.getVariable("x").equals(resOpt.getVariable("x")),
-                "Equivalência observável preservada estritamente!");
-=======
             check(resRaw.getVariable("x").equals(25), "Execução do TAC original resulta em x = 25");
             check(resOpt.getVariable("x").equals(25), "Execução do TAC otimizado resulta em x = 25");
             check(resRaw.getVariable("x").equals(resOpt.getVariable("x")), "Equivalência observável preservada estritamente!");
         } catch (Throwable t) {
             check(false, "Teste 1 abortado por exceção: " + t.getMessage());
         }
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
         // ---------------------------------------------------------------------
         // TESTE 2: Simplificações Algébricas
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("\n--- TESTE 2: Simplificações Algébricas (Identidades Clássicas) ---");
-        List<String> rawAlg = List.of(
-                "t1 = a + 0",
-                "t2 = 0 + b",
-                "t3 = c * 1",
-                "t4 = d * 0",
-                "t5 = e - 0",
-                "t6 = f / 1");
-        TACOptimizer opt2 = new TACOptimizer();
-        List<String> optAlg = opt2.optimize(rawAlg);
-=======
         try {
             System.out.println("\n--- TESTE 2: Simplificações Algébricas (Identidades Clássicas) ---");
             List<String> rawAlg = List.of(
@@ -140,7 +109,6 @@ public class OptimizationTestRunner {
             );
             TACOptimizer opt2 = new TACOptimizer();
             List<String> optAlg = opt2.optimize(rawAlg);
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
             check(optAlg.contains("t1 = a"), "Identidade aditiva: a + 0 -> a");
             check(optAlg.contains("t2 = b"), "Identidade aditiva: 0 + b -> b");
@@ -155,23 +123,6 @@ public class OptimizationTestRunner {
         // ---------------------------------------------------------------------
         // TESTE 3: Eliminação de Subexpressões Comuns (CSE)
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("\n--- TESTE 3: Eliminação de Subexpressões Comuns (CSE) ---");
-        List<String> rawCSE = List.of(
-                "t1 = a + b",
-                "x = t1",
-                "t2 = a + b",
-                "y = t2");
-        TACOptimizer opt3 = new TACOptimizer();
-        List<String> optCSE = opt3.optimize(rawCSE);
-
-        // t2 = a + b deve ser eliminado, reutilizando t1 / x
-        boolean hasDuplicateAdd = false;
-        int countAdd = 0;
-        for (String s : optCSE) {
-            if (s.contains("a + b"))
-                countAdd++;
-=======
         try {
             System.out.println("\n--- TESTE 3: Eliminação de Subexpressões Comuns (CSE) ---");
             List<String> rawCSE = List.of(
@@ -192,34 +143,11 @@ public class OptimizationTestRunner {
             check(countAdd == 1, "Apenas 1 cálculo de 'a + b' é mantido (reúso via CSE)");
         } catch (Throwable t) {
             check(false, "Teste 3 abortado por exceção: " + t.getMessage());
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
         }
 
         // ---------------------------------------------------------------------
         // TESTE 4: Eliminação de Código Morto (DCE) e Saltos Redundantes
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("\n--- TESTE 4: Código Morto, Saltos Redundantes e Inalcançáveis ---");
-        List<String> rawDCE = List.of(
-                "t1 = 10 + 20",
-                "t2 = 50",
-                "x = 100",
-                "goto L1",
-                "t3 = 999",
-                "L1:",
-                "goto L2",
-                "L2:",
-                "print x");
-        TACOptimizer opt4 = new TACOptimizer();
-        List<String> optDCE = opt4.optimize(rawDCE);
-
-        check(!optDCE.contains("t3 = 999"), "Instrução inalcançável após goto eliminada");
-        check(!optDCE.contains("goto L2"), "Salto redundante imediatamente anterior a L2: eliminado");
-        check(!optDCE.contains("t1 = 30") && !optDCE.contains("t1 = 10 + 20"), "Temporária t1 não lida eliminada");
-        check(!optDCE.contains("t2 = 50"), "Temporária t2 não lida eliminada");
-        check(optDCE.contains("print 100") || (optDCE.contains("x = 100") && optDCE.contains("print x")),
-                "Instrução útil print mantida");
-=======
         try {
             System.out.println("\n--- TESTE 4: Código Morto, Saltos Redundantes e Inalcançáveis ---");
             List<String> rawDCE = List.of(
@@ -245,22 +173,10 @@ public class OptimizationTestRunner {
         } catch (Throwable t) {
             check(false, "Teste 4 abortado por exceção: " + t.getMessage());
         }
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
         // ---------------------------------------------------------------------
         // TESTE 5: Pipeline Completo End-to-End (Fonte MicroC -> Execução)
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("\n--- TESTE 5: Pipeline Completo End-to-End (MicroC -> Execução) ---");
-        String prog1 = """
-                int a = 10;
-                int b = 20;
-                int c = (a * 2) + (b / 2);
-                print(c);
-                """;
-        CompilerPipeline pipeline = new CompilerPipeline();
-        CompilationResult res1 = pipeline.compileString(prog1);
-=======
         try {
             System.out.println("\n--- TESTE 5: Pipeline Completo End-to-End (MicroC -> Execução) ---");
             String prog1 = """
@@ -271,7 +187,6 @@ public class OptimizationTestRunner {
             """;
             CompilerPipeline pipeline = new CompilerPipeline();
             CompilationResult res1 = pipeline.compileString(prog1);
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
             check(res1.success, "Pipeline compilou com sucesso");
             check(res1.executionResult != null, "Back-end executou com sucesso");
@@ -283,19 +198,6 @@ public class OptimizationTestRunner {
         // ---------------------------------------------------------------------
         // TESTE 6: Programa com Laço While e Execução
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("\n--- TESTE 6: Laço While com Acumulador e Execução no Back-end ---");
-        String progWhile = """
-                int sum = 0;
-                int i = 1;
-                while (i <= 5) {
-                    sum = sum + i;
-                    i = i + 1;
-                }
-                print(sum);
-                """;
-        CompilationResult resWhile = pipeline.compileString(progWhile);
-=======
         try {
             System.out.println("\n--- TESTE 6: Laço While com Acumulador e Execução no Back-end ---");
             String progWhile = """
@@ -309,7 +211,6 @@ public class OptimizationTestRunner {
             """;
             CompilerPipeline pipeline = new CompilerPipeline();
             CompilationResult resWhile = pipeline.compileString(progWhile);
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
             check(resWhile.success, "Compilação de laço while concluída com sucesso");
             check(resWhile.executionResult.getOutputLines().contains("15"), "Somatório de 1 a 5 calculado: 15");
@@ -321,17 +222,6 @@ public class OptimizationTestRunner {
         // ---------------------------------------------------------------------
         // TESTE 7: Exemplo da Seção 8 do PDF (Função main com retorno)
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("\n--- TESTE 7: Exemplo da Seção 8 do PDF (int main() { int a; a = 10; return a; }) ---");
-        String progMain = """
-                int main() {
-                    int a;
-                    a = 10;
-                    return a;
-                }
-                """;
-        CompilationResult resMain = pipeline.compileString(progMain);
-=======
         try {
             System.out.println("\n--- TESTE 7: Exemplo da Seção 8 do PDF (int main() { int a; a = 10; return a; }) ---");
             String progMain = """
@@ -343,7 +233,6 @@ public class OptimizationTestRunner {
             """;
             CompilerPipeline pipeline = new CompilerPipeline();
             CompilationResult resMain = pipeline.compileString(progMain);
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
             check(resMain.success, "Função main do PDF Seção 8 compilada com sucesso");
             check(resMain.executionResult.getReturnValue() != null && resMain.executionResult.getReturnValue() == 10,
@@ -355,14 +244,6 @@ public class OptimizationTestRunner {
         // ---------------------------------------------------------------------
         // TESTE 8: Detecção e Tratamento de Erros Semânticos (Item 2)
         // ---------------------------------------------------------------------
-<<<<<<< HEAD
-        System.out.println("\n--- TESTE 8: Tratamento de Erro Semântico (Variável Não Declarada) ---");
-        String progErro = """
-                int x = 10;
-                y = 20;
-                """;
-        CompilationResult resErro = pipeline.compileString(progErro);
-=======
         try {
             System.out.println("\n--- TESTE 8: Tratamento de Erro Semântico (Variável Não Declarada) ---");
             String progErro = """
@@ -371,7 +252,6 @@ public class OptimizationTestRunner {
             """;
             CompilerPipeline pipeline = new CompilerPipeline();
             CompilationResult resErro = pipeline.compileString(progErro);
->>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
 
             check(!resErro.success, "Pipeline abortou compilação para variável não declarada");
             check(resErro.failedStage.equals("Análise Semântica"), "Etapa com falha identificada: Análise Semântica");

@@ -45,14 +45,16 @@ Uma versão resumida da gramática reconhecida é:
 Programa       ::= (Funcao | Declaracao | Comando)* EOF
 Funcao         ::= TipoRetorno ID "(" Parametros? ")" Bloco
 Parametros     ::= Parametro ("," Parametro)*
-Parametro      ::= ("int" | "float") ID
-Declaracao     ::= ("int" | "float") ID ("=" Expressao)? ";"
-Comando        ::= Declaracao | ID "=" Expressao ";"
+Parametro      ::= "const"? ("int" | "float") ID
+Declaracao     ::= "const"? ("int" | "float") ID ("=" Expressao)? ";"
+Comando        ::= Declaracao | ID "=" Expressao ";" | Chamada ";"
                  | "print" "(" Expressao ")" ";"
                  | "if" "(" Expressao ")" Bloco ("else" Bloco)?
                  | "while" "(" Expressao ")" Bloco
                  | "break" ";" | "continue" ";" | "return" Expressao? ";"
                  | Bloco
+Chamada        ::= ID "(" Argumentos? ")"
+Argumentos     ::= Expressao ("," Expressao)*
 Bloco          ::= "{" Comando* "}"
 TipoRetorno    ::= "int" | "float" | "void"
 Expressao      ::= OuLogico
@@ -62,16 +64,19 @@ Igualdade      ::= Relacional (("==" | "!=") Relacional)*
 Relacional     ::= Soma (("<" | "<=" | ">" | ">=") Soma)*
 Soma           ::= Produto (("+" | "-") Produto)*
 Produto        ::= Unaria (("*" | "/") Unaria)*
-Unaria         ::= ("!" | "-") Unaria | NUMERO | STRING | ID
+Unaria         ::= ("!" | "-") Unaria | NUMERO | STRING | ID | Chamada
                  | "(" Expressao ")"
 ```
 
-Chamadas de função não fazem parte da gramática implementada. Erros léxicos e
-sintáticos são reportados com linha e contexto. A análise semântica usa uma
-tabela de símbolos por escopo e verifica declaração antes do uso,
-redeclarações no mesmo escopo, inicialização e compatibilidade de tipos.
-Sombreamento em blocos internos é permitido e sua identidade é preservada na
-tradução e execução.
+Chamadas de função são aceitas como comandos ou em expressões. A análise
+semântica verifica declaração da função, quantidade e tipos dos argumentos;
+também valida `return` dentro de funções e sua compatibilidade com o tipo de
+retorno. Variáveis e parâmetros `const` precisam de inicialização e não podem
+ser reatribuídos. Erros léxicos e sintáticos são reportados com linha e
+contexto. A análise semântica usa uma tabela de símbolos por escopo e verifica
+declaração antes do uso, redeclarações no mesmo escopo, inicialização e
+compatibilidade de tipos. Sombreamento em blocos internos é permitido e sua
+identidade é preservada na tradução e execução.
 
 ### Tipos numéricos
 
@@ -111,19 +116,22 @@ O pipeline compara a execução do TAC original com a do TAC otimizado para
 verificar que a saída observável é preservada nos exemplos testados.
 
 **Implementações recentes:** suporte a `float` e promoção numérica; preservação
-de variáveis sombreadas no TAC e na memória; e ampliação das simplificações do
-otimizador. As decisões e justificativas técnicas estão resumidas neste
-documento e detalhadas no [relatório técnico](relatorio_tecnico_sdt.html).
+de variáveis sombreadas no TAC e na memória; ampliação das simplificações do
+otimizador; constantes `const`; chamadas e execução de funções, inclusive
+recursivas; e validação semântica de `return`. As decisões e justificativas
+técnicas estão resumidas neste documento e detalhadas no
+[relatório técnico](relatorio_tecnico_sdt.html).
 
 ## 4. Programas de teste e demonstração
 
 Os programas de demonstração estão como exemplos MicroC em
-[`Main.java`](src/main/java/main/Main.java). As baterias automatizadas ficam em
+[`Main.java`](src/main/java/main/Main.java). Os testes automatizados incluem
+[`TestSuiteRunner`](src/test/java/test/TestSuiteRunner.java),
+[`FeatureValidationRunner`](src/main/java/main/FeatureValidationRunner.java),
 [`SDTTestRunner`](src/main/java/sdt/SDTTestRunner.java) e
 [`OptimizationTestRunner`](src/main/java/optimizer/OptimizationTestRunner.java).
-Elas cobrem precedência, RPN/TAC, laços e saltos, otimização, execução e
-preservação de escopos. Os runners imprimem as verificações aprovadas e as
-falhas encontradas.
+Eles cobrem análise léxica, sintática e semântica, `const`, chamadas e retornos
+de funções, RPN/TAC, laços, otimização e execução.
 
 Exemplo simples para acompanhar a demonstração:
 
@@ -142,25 +150,27 @@ print(total);  // saída: 15.0
 Pré-requisitos: **JDK 21** e **Maven**. No PowerShell, na pasta do projeto:
 
 ```powershell
-mvn clean compile
+mvn clean test
 java -cp target\classes main.Main
 ```
 
-Para executar as baterias separadamente:
+Para executar as baterias separadamente (PowerShell):
 
 ```powershell
+java -cp "target\classes;target\test-classes" test.TestSuiteRunner
+java -cp target\classes main.FeatureValidationRunner
 java -cp target\classes sdt.SDTTestRunner
 java -cp target\classes optimizer.OptimizationTestRunner
 ```
 
-O [`pom.xml`](pom.xml) configura a versão Java e a classe principal. Não são
-necessárias dependências externas além do Maven e do JDK.
+O Maven compila as fontes; os casos da suíte customizada são executados pelo
+`TestSuiteRunner` acima. O [`pom.xml`](pom.xml) configura a versão Java e a
+classe principal. Não são necessárias dependências externas além do Maven e do
+JDK.
 
 ## 6. Limitações e conclusão
 
-O back-end atual interpreta TAC; não gera assembly nem código de máquina.
-Definições de função são reconhecidas parcialmente, mas chamadas e validação
-completa de argumentos e retornos ainda têm limitações. O projeto demonstra a
-integração entre front-end, tradução, otimização e execução em um compilador
-didático, sem implementar toda a linguagem C nem um compilador para uma
-arquitetura real.
+O back-end interpreta TAC; não gera assembly nem código de máquina. O projeto
+implementa um subconjunto didático de MicroC, não toda a linguagem C. Ainda
+assim, demonstra o fluxo integrado de análise, validação, tradução, otimização
+e execução, incluindo constantes, chamadas de função e retornos.

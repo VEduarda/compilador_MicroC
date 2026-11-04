@@ -44,8 +44,15 @@ public final class SemanticUnitTests {
                     "Esperava operação inválida para string");
         });
 
-        tests.pending("Semântica impede reatribuição de constantes",
-                "A linguagem não declara constantes nem possui palavra reservada const.");
+        tests.add("Semântica exige inicialização e impede reatribuição de constantes", () -> {
+            List<SemanticError> reassignmentErrors = analyze("const int fixed = 1; fixed = 2;");
+            TestFramework.assertTrue(hasRule(reassignmentErrors, "R9-ReatribuicaoConstante"),
+                    "Esperava erro ao reatribuir uma constante");
+
+            List<SemanticError> initializationErrors = analyze("const float rate;");
+            TestFramework.assertTrue(hasRule(initializationErrors, "R9-ConstanteNaoInicializada"),
+                    "Esperava erro para constante sem inicialização");
+        });
     }
 
     public static List<SemanticError> analyze(String source) {

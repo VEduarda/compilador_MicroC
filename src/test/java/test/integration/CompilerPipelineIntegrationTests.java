@@ -91,7 +91,20 @@ public final class CompilerPipelineIntegrationTests {
                     "O relatório deve registrar otimizações realizadas");
         });
 
-        tests.pending("Pipeline compila e executa chamadas de função",
-                "O Parser não possui sintaxe de chamada de função; apenas as declarações são reconhecidas.");
+        tests.add("Pipeline compila e executa chamadas de função", () -> {
+            String source = """
+                    int doubleValue(int value) {
+                        return value * 2;
+                    }
+                    int main() {
+                        return doubleValue(21);
+                    }
+                    """;
+            CompilationResult result = new CompilerPipeline().compileString(source);
+            TestFramework.assertTrue(result.success,
+                    "Programa com chamada de função deve compilar: " + result.errorMessage);
+            TestFramework.assertEquals(42, result.executionResult.getReturnValue(),
+                    "Resultado da chamada de função");
+        });
     }
 }
