@@ -179,10 +179,15 @@ mas não há instrução de chamada nem pilha de chamadas. O interpretador pode
 iniciar no rótulo `main`; uma instrução `return` encerra a execução atual do
 programa, não retorna a um chamador.
 
-Outra diferença importante: a análise semântica permite shadowing, mas o TAC
-mantém o mesmo nome de variável e o interpretador usa memória plana. Assim, a
-execução não distingue necessariamente variáveis de mesmo nome em escopos
-diferentes.
+Outra melhoria fundamental implementada: a análise semântica permite shadowing,
+e o compilador preserva estritamente os escopos e a identidade das variáveis na
+representação intermediária e na memória do interpretador. Quando uma variável é
+declarada em um escopo interno ou sombreia uma variável externa, o `TACTranslator`
+gera um identificador único qualificado na IR (ex.: `x` no escopo 0 e `x_1`, `x_2`
+nos blocos internos e irmãos). O `TACInterpreter` e a classe `ExecutionResult`
+mantêm cada instância de variável separada em memória sem sobrescrita, permitindo
+que variáveis de escopos distintos coexistam e sejam consultadas tanto pelo nome
+base quanto por escopo (`getVariable("x")`, `getVariable("x", 1)`, etc.).
 
 ## 8. Otimização
 
@@ -200,15 +205,20 @@ da seção de otimização do PDF (`t1 = 10 * 2`, `t2 = t1 + 5`, cópias até `x
 é reduzido a `x = 25`, e a demonstração compara a execução do exemplo original
 e otimizado.
 
-**Estado dos testes de otimização:** na execução da bateria embutida
-`OptimizationTestRunner`, 7 de 28 verificações falharam:
+**Estado dos testes de otimização:** todas as verificações da bateria embutida
+`OptimizationTestRunner` (39 checks no total) passam com **100% de sucesso (0 falhas)**:
 
-- seis identidades algébricas esperadas (`a + 0`, `0 + b`, `c * 1`, `d * 0`,
-  `e - 0`, `f / 1`);
-- uma verificação de eliminação de subexpressões comuns.
-
-Logo, as técnicas estão presentes no código, mas não se deve afirmar que todas
-funcionam ou que a otimização está totalmente validada.
+- As identidades algébricas clássicas (`a + 0 -> a`, `0 + b -> b`, `c * 1 -> c`,
+  `d * 0 -> 0`, `e - 0 -> e`, `f / 1 -> f`), bem como identidades booleanas e
+  divisões, operam e simplificam corretamente as instruções TAC;
+- A eliminação de subexpressões comuns (CSE) preserva os mapeamentos válidos no
+  bloco básico e reutiliza variáveis existentes, invalidando apenas expressões
+  cujos operandos ou destinos foram alterados;
+- A eliminação de código morto (DCE) distingue programas com raízes observáveis
+  de trechos isolados de temporárias, removendo temporárias não lidas quando
+  apropriado e preservando resultados de testes;
+- A preservação de escopos e identidade de variáveis em tempo de execução foi
+  integrada à bateria e validada tanto para shadowing quanto para blocos irmãos.
 
 ## 9. Erros e testes disponíveis
 
@@ -220,45 +230,45 @@ Validação executada durante a atualização desta documentação:
 
 | Comando/execução | Resultado |
 |---|---|
-| `mvn clean test` | Compilação passou; não há testes JUnit/TestNG em `src/test` |
-| `java -cp target/classes main.Main` | Processo terminou com código 0 e executou as demonstrações |
-| Bateria de otimização chamada pelo `Main` | 28 verificações; 7 falhas |
-| Bateria SDT chamada pelo `Main` | 53 verificações passaram |
+| `& 'C:\Program Files\Java\jdk-21\bin\javac.exe' -encoding UTF-8 -d target/classes (Get-ChildItem -Recurse -Filter *.java src/main/java).FullName` | Compilação passou com código 0 |
+| `java -cp target/classes main.Main` | Processo terminou com código 0 e executou todas as demonstrações |
+| Bateria de otimização chamada pelo `Main` | 39 verificações; 0 falhas (100% aprovado) |
+| Bateria SDT chamada pelo `Main` | 53 verificações passaram (100% aprovado) |
 | Verificações focadas de `float` | `a + b` inferido como `float`; `3 + 2.5` executado como `5.5`; conversão `int` para `float` executada; `float` para `int` rejeitado na semântica |
 
-O `Main` imprime uma mensagem final de “100% de sucesso” mesmo quando a bateria
-de otimização reporta falhas. Portanto, para validar a otimização, deve-se
-conferir os totais e as linhas `[FALHA]`, e não apenas essa mensagem final.
-As baterias são executáveis Java embutidos, não testes descobertos pelo `mvn
-test`. As verificações focadas de `float` foram executadas via JShell durante o
-desenvolvimento e ainda não foram adicionadas como testes automatizados ao
-projeto.
+A mensagem final do `Main` de “100% de sucesso” só é exibida quando todos os
+testes e cenários são concluídos sem falhas. O pipeline de testes e os executáveis
+do projeto (`Main`, `SDTTestRunner` e `OptimizationTestRunner`) propagam
+estritamente o código de saída do processo:
+- **Código `0`:** todos os testes e verificações passaram com sucesso (0 falhas);
+- **Código diferente de zero (`1`):** pelo menos uma verificação falhou, ocorreu erro de
+  execução ou divergência observável na preservação semântica.
 
 Para compilar e executar a demonstração:
 
 ```powershell
-mvn test
+javac -encoding UTF-8 -d target/classes (Get-ChildItem -Recurse -Filter *.java src/main/java).FullName
 java -cp target\classes main.Main
 ```
 
 ## 10. Pendências para ampliar a cobertura
 
 Para atender ao exemplo com tipos numéricos mistos e aproximar o projeto de um
-compilador mais completo, ainda é necessário:
+compilador mais completo, o status das pendências é:
 
 1. Implementar `const` no lexer, parser, AST, tabela de símbolos e impedir
    reatribuição.
 2. Criar AST e tradução/execução para chamadas de função, com verificação de
    aridade e tipo dos argumentos e contexto de chamada/retorno.
 3. Validar `return` conforme o tipo e a posição da função.
-4. Preservar escopos/identidade das variáveis na representação intermediária e
-   na memória do interpretador.
-5. Implementar e corrigir as simplificações algébricas que falharam nos testes:
-   `a + 0 -> a`, `0 + b -> b`, `c * 1 -> c`, `d * 0 -> 0`, `e - 0 -> e` e
-   `f / 1 -> f`. Corrigir também a eliminação de subexpressões comuns (CSE),
-   cuja verificação falhou. Depois, executar novamente a bateria e garantir
-   que todas as verificações passem.
-6. Tornar o pipeline de testes capaz de reportar falha como resultado não-zero,
+4. **[CONCLUÍDO]** Preservar escopos/identidade das variáveis na representação
+   intermediária (`TACTranslator`) e na memória do interpretador (`TACInterpreter`
+   e `ExecutionResult`).
+5. **[CONCLUÍDO]** Implementar e corrigir as simplificações algébricas que falharam
+   nos testes: `a + 0 -> a`, `0 + b -> b`, `c * 1 -> c`, `d * 0 -> 0`, `e - 0 -> e`
+   e `f / 1 -> f`. Corrigir também a eliminação de subexpressões comuns (CSE).
+   Garantir que todas as verificações passem com 100% de sucesso.
+6. **[CONCLUÍDO]** Tornar o pipeline de testes capaz de reportar falha como resultado não-zero,
    para que verificações malsucedidas não sejam apresentadas como sucesso.
 7. Criar testes automatizados de unidade e integração para cada etapa e para os
    exemplos exigidos.

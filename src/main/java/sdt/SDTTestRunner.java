@@ -51,7 +51,18 @@ public class SDTTestRunner {
 
     public static void main(String[] args) {
         System.setOut(new java.io.PrintStream(System.out, true, java.nio.charset.StandardCharsets.UTF_8));
-        runAllTests();
+        try {
+            boolean success = runAllTests();
+            if (!success || failedChecks > 0) {
+                System.err.printf("%n[FALHA] %d de %d verificações falharam na bateria SDT.%n",
+                        failedChecks, totalChecks);
+                System.exit(1);
+            }
+        } catch (Throwable t) {
+            System.err.println("\n[ERRO CRÍTICO DE EXECUÇÃO]: " + t.getMessage());
+            t.printStackTrace(System.err);
+            System.exit(1);
+        }
     }
 
     public static void resetMetrics() {
@@ -101,7 +112,7 @@ public class SDTTestRunner {
         return true;
     }
 
-    public static void runAllTests() {
+    public static boolean runAllTests() {
         resetMetrics();
 
         System.out.println("================================================================================");
@@ -109,27 +120,27 @@ public class SDTTestRunner {
         System.out.println("                   BATERIA DE TESTES E VALIDAÇÃO COMPLETA           ");
         System.out.println("================================================================================");
 
-        runTest1();
-        runTest2();
-        runTest3();
-        runTest4();
-        runTest5();
-        runTest6();
-        runTest7();
-        runTest8();
-        runTest9();
-        runTest10();
-        runTest11();
-        runTest12();
-        runTest13();
-        runTest14();
-        runTest15();
-        runTest16();
-        runTest17();
-        runTest18();
-        runTest19();
-        runTest20();
-        runTest21();
+        try { runTest1(); } catch (Throwable t) { check(false, "Teste 1 abortado por exceção: " + t.getMessage()); }
+        try { runTest2(); } catch (Throwable t) { check(false, "Teste 2 abortado por exceção: " + t.getMessage()); }
+        try { runTest3(); } catch (Throwable t) { check(false, "Teste 3 abortado por exceção: " + t.getMessage()); }
+        try { runTest4(); } catch (Throwable t) { check(false, "Teste 4 abortado por exceção: " + t.getMessage()); }
+        try { runTest5(); } catch (Throwable t) { check(false, "Teste 5 abortado por exceção: " + t.getMessage()); }
+        try { runTest6(); } catch (Throwable t) { check(false, "Teste 6 abortado por exceção: " + t.getMessage()); }
+        try { runTest7(); } catch (Throwable t) { check(false, "Teste 7 abortado por exceção: " + t.getMessage()); }
+        try { runTest8(); } catch (Throwable t) { check(false, "Teste 8 abortado por exceção: " + t.getMessage()); }
+        try { runTest9(); } catch (Throwable t) { check(false, "Teste 9 abortado por exceção: " + t.getMessage()); }
+        try { runTest10(); } catch (Throwable t) { check(false, "Teste 10 abortado por exceção: " + t.getMessage()); }
+        try { runTest11(); } catch (Throwable t) { check(false, "Teste 11 abortado por exceção: " + t.getMessage()); }
+        try { runTest12(); } catch (Throwable t) { check(false, "Teste 12 abortado por exceção: " + t.getMessage()); }
+        try { runTest13(); } catch (Throwable t) { check(false, "Teste 13 abortado por exceção: " + t.getMessage()); }
+        try { runTest14(); } catch (Throwable t) { check(false, "Teste 14 abortado por exceção: " + t.getMessage()); }
+        try { runTest15(); } catch (Throwable t) { check(false, "Teste 15 abortado por exceção: " + t.getMessage()); }
+        try { runTest16(); } catch (Throwable t) { check(false, "Teste 16 abortado por exceção: " + t.getMessage()); }
+        try { runTest17(); } catch (Throwable t) { check(false, "Teste 17 abortado por exceção: " + t.getMessage()); }
+        try { runTest18(); } catch (Throwable t) { check(false, "Teste 18 abortado por exceção: " + t.getMessage()); }
+        try { runTest19(); } catch (Throwable t) { check(false, "Teste 19 abortado por exceção: " + t.getMessage()); }
+        try { runTest20(); } catch (Throwable t) { check(false, "Teste 20 abortado por exceção: " + t.getMessage()); }
+        try { runTest21(); } catch (Throwable t) { check(false, "Teste 21 abortado por exceção: " + t.getMessage()); }
 
         System.out.println("================================================================================");
         if (failedChecks == 0) {
@@ -138,6 +149,8 @@ public class SDTTestRunner {
             System.out.printf("   ATENÇÃO: %d DE %d CHECKS FALHARAM!%n", failedChecks, totalChecks);
         }
         System.out.println("================================================================================\n");
+
+        return failedChecks == 0;
     }
 
     /**

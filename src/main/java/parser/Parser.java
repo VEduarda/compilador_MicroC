@@ -83,10 +83,17 @@ public class Parser {
         if (match(TokenType.RETURN))
             return parseReturn();
 
+<<<<<<< HEAD
         if (check(TokenType.ID)) {
             if (current + 1 < tokens.size() && tokens.get(current + 1).type == TokenType.LPAREN) {
                 return parseFunctionCallStatement();
             }
+=======
+        if (check(TokenType.LBRACE))
+            return parseBlock();
+
+        if (check(TokenType.ID))
+>>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
             return parseAssignment();
         }
 

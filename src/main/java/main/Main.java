@@ -122,36 +122,38 @@ public class Main {
         System.out.println("              Itens Desenvolvidos: 2 (Projeto), 3 (Fluxo), 4 (Execução) e 5 (Otimização) ");
         System.out.println("================================================================================\n");
 
-        // ---------------------------------------------------------------------
-        // 1. DEMONSTRAÇÃO DO PIPELINE COMPLETO (PROGRAMA 1)
-        // ---------------------------------------------------------------------
-        System.out.println(">>> CENARIO 1: PROGRAMA COMPLETO MICROC (EXECUCAO DE TODAS AS ETAPAS)");
-        runFullPipeline(PROGRAMA_1_COMPLETO, "Exemplo 1: Programa Integrado MicroC");
+        boolean allPassed = true;
 
-        // ---------------------------------------------------------------------
-        // 2. DEMONSTRAÇÃO DA SEÇÃO 5 DO PDF (OTIMIZAÇÃO ANTES E DEPOIS)
-        // ---------------------------------------------------------------------
-        System.out.println("\n================================================================================");
-        System.out.println(">>> CENARIO 2: EXEMPLO EXATO DA SECAO 5 DO ENUNCIADO .PDF (OTIMIZACAO)");
-        System.out.println("================================================================================");
-        demonstratePdfSection5();
+        try {
+            // ---------------------------------------------------------------------
+            // 1. DEMONSTRAÇÃO DO PIPELINE COMPLETO (PROGRAMA 1)
+            // ---------------------------------------------------------------------
+            System.out.println(">>> CENARIO 1: PROGRAMA COMPLETO MICROC (EXECUCAO DE TODAS AS ETAPAS)");
+            if (!runFullPipeline(PROGRAMA_1_COMPLETO, "Exemplo 1: Programa Integrado MicroC")) {
+                allPassed = false;
+            }
 
-        // ---------------------------------------------------------------------
-        // 3. DEMONSTRAÇÃO DO LAÇO WHILE COM ACUMULADOR (PROGRAMA 2)
-        // ---------------------------------------------------------------------
-        System.out.println("\n================================================================================");
-        System.out.println(">>> CENARIO 3: LACO WHILE COM ACUMULADOR E PRINTS");
-        System.out.println("================================================================================");
-        runFullPipeline(PROGRAMA_2_WHILE, "Exemplo 2: Laço While com Acumulador");
+            // ---------------------------------------------------------------------
+            // 2. DEMONSTRAÇÃO DA SEÇÃO 5 DO PDF (OTIMIZAÇÃO ANTES E DEPOIS)
+            // ---------------------------------------------------------------------
+            System.out.println("\n================================================================================");
+            System.out.println(">>> CENARIO 2: EXEMPLO EXATO DA SECAO 5 DO ENUNCIADO .PDF (OTIMIZACAO)");
+            System.out.println("================================================================================");
+            if (!demonstratePdfSection5()) {
+                allPassed = false;
+            }
 
-        // ---------------------------------------------------------------------
-        // 4. DEMONSTRAÇÃO DA SEÇÃO 8 DO PDF (FUNÇÃO MAIN COM RETORNO)
-        // ---------------------------------------------------------------------
-        System.out.println("\n================================================================================");
-        System.out.println(">>> CENARIO 4: EXEMPLO DA SECAO 8 DO ENUNCIADO .PDF (int main() COM RETURN)");
-        System.out.println("================================================================================");
-        runFullPipeline(PROGRAMA_4_MAIN_SECAO8, "Exemplo 4: Seção 8 - int main() com return");
+            // ---------------------------------------------------------------------
+            // 3. DEMONSTRAÇÃO DO LAÇO WHILE COM ACUMULADOR (PROGRAMA 2)
+            // ---------------------------------------------------------------------
+            System.out.println("\n================================================================================");
+            System.out.println(">>> CENARIO 3: LACO WHILE COM ACUMULADOR E PRINTS");
+            System.out.println("================================================================================");
+            if (!runFullPipeline(PROGRAMA_2_WHILE, "Exemplo 2: Laço While com Acumulador")) {
+                allPassed = false;
+            }
 
+<<<<<<< HEAD
         // ---------------------------------------------------------------------
         // 5. DEMONSTRAÇÃO DETALHADA DO TRATAMENTO DE ERROS (LÉXICOS, SINTÁTICOS E
         // SEMÂNTICOS)
@@ -170,17 +172,73 @@ public class Main {
         OptimizationTestRunner.runTests();
         SDTTestRunner.runAllTests();
         FeatureValidationRunner.runAllValidationTests();
+=======
+            // ---------------------------------------------------------------------
+            // 4. DEMONSTRAÇÃO DA SEÇÃO 8 DO PDF (FUNÇÃO MAIN COM RETORNO)
+            // ---------------------------------------------------------------------
+            System.out.println("\n================================================================================");
+            System.out.println(">>> CENARIO 4: EXEMPLO DA SECAO 8 DO ENUNCIADO .PDF (int main() COM RETURN)");
+            System.out.println("================================================================================");
+            if (!runFullPipeline(PROGRAMA_4_MAIN_SECAO8, "Exemplo 4: Seção 8 - int main() com return")) {
+                allPassed = false;
+            }
 
-        System.out.println("\n================================================================================");
-        System.out.println("       TODAS AS ETAPAS E TRATAMENTOS DE ERRO VALIDADOS COM 100% DE SUCESSO!      ");
-        System.out.println("================================================================================\n");
+            // ---------------------------------------------------------------------
+            // 5. DEMONSTRAÇÃO DETALHADA DO TRATAMENTO DE ERROS (LÉXICOS, SINTÁTICOS E SEMÂNTICOS)
+            // ---------------------------------------------------------------------
+            System.out.println("\n================================================================================");
+            System.out.println(">>> CENARIO 5: TRATAMENTO DE ERROS (LEXICOS, SINTATICOS E SEMANTICOS)");
+            System.out.println("================================================================================");
+            if (!demonstrateErrorHandling()) {
+                allPassed = false;
+            }
+>>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
+
+            // ---------------------------------------------------------------------
+            // 6. EXECUÇÃO DAS BATERIAS DE TESTES AUTOMATIZADOS (TODOS COM SUCESSO)
+            // ---------------------------------------------------------------------
+            System.out.println("\n================================================================================");
+            System.out.println(">>> CENÁRIO 6: BATERIA DE TESTES DE VALIDAÇÃO (OTIMIZACAO, EXECUCAO E SDT)");
+            System.out.println("================================================================================\n");
+            boolean optSuccess = OptimizationTestRunner.runTests();
+            if (!optSuccess || OptimizationTestRunner.getFailedChecks() > 0) {
+                allPassed = false;
+            }
+
+            boolean sdtSuccess = SDTTestRunner.runAllTests();
+            if (!sdtSuccess || SDTTestRunner.getFailedChecks() > 0) {
+                allPassed = false;
+            }
+
+        } catch (Throwable t) {
+            System.err.println("\n[ERRO CRÍTICO DE EXECUÇÃO]: " + t.getMessage());
+            t.printStackTrace(System.err);
+            allPassed = false;
+        }
+
+        if (allPassed) {
+            System.out.println("\n================================================================================");
+            System.out.println("       TODAS AS ETAPAS E TRATAMENTOS DE ERRO VALIDADOS COM 100% DE SUCESSO!      ");
+            System.out.println("================================================================================\n");
+        } else {
+            System.err.println("\n================================================================================");
+            System.err.println("       FALHA DETECTADA NO PIPELINE OU NAS BATERIAS DE TESTES!                   ");
+            if (OptimizationTestRunner.getFailedChecks() > 0) {
+                System.err.printf("       -> Bateria de Otimização e Execução: %d falha(s)%n", OptimizationTestRunner.getFailedChecks());
+            }
+            if (SDTTestRunner.getFailedChecks() > 0) {
+                System.err.printf("       -> Bateria de Tradução Dirigida por Sintaxe (SDT): %d falha(s)%n", SDTTestRunner.getFailedChecks());
+            }
+            System.err.println("================================================================================\n");
+            System.exit(1);
+        }
     }
 
     /**
      * Executa o pipeline de compilação completo para um código-fonte MicroC em
      * texto.
      */
-    public static void runFullPipeline(String code, String programTitle) {
+    public static boolean runFullPipeline(String code, String programTitle) {
         System.out.println("--------------------------------------------------------------------------------");
         System.out.println("FLUXO DE COMPILACAO CANONICO: " + programTitle);
         System.out.println("--------------------------------------------------------------------------------");
@@ -201,7 +259,7 @@ public class Main {
         if (!res.success && "Análise Léxica".equals(res.failedStage)) {
             System.err.println("\n[COMPILACAO INTERROMPIDA POR ERRO LEXICO]:");
             System.err.println("   " + res.errorMessage);
-            return;
+            return false;
         }
 
         // ETAPA 2: ANÁLISE SINTÁTICA
@@ -214,7 +272,7 @@ public class Main {
         if (!res.success && "Análise Sintática".equals(res.failedStage)) {
             System.err.println("\n[COMPILACAO INTERROMPIDA POR ERRO SINTATICO]:");
             System.err.println("   " + res.errorMessage);
-            return;
+            return false;
         }
 
         // ETAPA 3: ANÁLISE SEMÂNTICA
@@ -227,13 +285,18 @@ public class Main {
             }
         }
 
+<<<<<<< HEAD
         if (!res.semanticErrors.isEmpty()) {
             System.err
                     .println("\n[COMPILACAO INTERROMPIDA POR ERROS SEMANTICOS (" + res.semanticErrors.size() + ")]: ");
+=======
+        if (!res.semanticErrors.isEmpty() || (!res.success && "Análise Semântica".equals(res.failedStage))) {
+            System.err.println("\n[COMPILACAO INTERROMPIDA POR ERROS SEMANTICOS (" + res.semanticErrors.size() + ")]: ");
+>>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
             for (SemanticError err : res.semanticErrors) {
                 System.err.println("   " + err);
             }
-            return;
+            return false;
         } else {
             System.out.println("\n   >> Análise semântica concluída sem nenhum erro!");
         }
@@ -255,8 +318,17 @@ public class Main {
             res.executionResult.printSummary();
         }
 
+<<<<<<< HEAD
         // VALIDAÇÃO DA PRESERVAÇÃO SEMÂNTICA (EXECUÇÃO COMPARATIVA ORIGINAL VS
         // OTIMIZADO)
+=======
+        if (!res.success) {
+            System.err.println("\n[COMPILACAO/EXECUCAO INTERROMPIDA]: " + res.errorMessage);
+            return false;
+        }
+
+        // VALIDAÇÃO DA PRESERVAÇÃO SEMÂNTICA (EXECUÇÃO COMPARATIVA ORIGINAL VS OTIMIZADO)
+>>>>>>> 0386036b6b61a970d21b8675db2f510d7ba7fe3c
         System.out.println("--- VALIDACAO DE PRESERVACAO SEMANTICA (ITEM 5 DO ENUNCIADO) ---");
         TACInterpreter quietInterp = new TACInterpreter(false);
         ExecutionResult execRaw = quietInterp.execute(res.rawTAC);
@@ -276,12 +348,18 @@ public class Main {
                         ? ((execRaw.getInstructionsExecuted() - execOpt.getInstructionsExecuted()) * 100.0
                                 / execRaw.getInstructionsExecuted())
                         : 0.0);
+
+        if (!outputMatch) {
+            System.err.println("\n[FALHA DE PRESERVAÇÃO SEMÂNTICA]: Divergência observável entre TAC original e otimizado!");
+            return false;
+        }
+        return true;
     }
 
     /**
      * Demonstra a otimização conforme o exemplo literal da Seção 5 do PDF.
      */
-    private static void demonstratePdfSection5() {
+    private static boolean demonstratePdfSection5() {
         List<String> rawPdfExample = List.of(
                 "t1 = 10 * 2",
                 "t2 = t1 + 5",
@@ -311,20 +389,26 @@ public class Main {
         ExecutionResult rawEx = interp.execute(rawPdfExample);
         ExecutionResult optEx = interp.execute(optPdf);
 
+        boolean success = rawEx.getVariable("x") != null
+                && rawEx.getVariable("x").equals(optEx.getVariable("x"))
+                && Integer.valueOf(25).equals(optEx.getVariable("x"));
+
         System.out.println("\nComprovacao de execucao no Back-end:");
         System.out.println("   Valor de x (Original)  = " + rawEx.getVariable("x"));
         System.out.println("   Valor de x (Otimizado) = " + optEx.getVariable("x"));
-        System.out.println("   Resultado              = " + (rawEx.getVariable("x").equals(optEx.getVariable("x"))
+        System.out.println("   Resultado              = " + (success
                 ? "SUCESSO: x = 25 (Preservacao semantica e reducao para 1 instrução)"
                 : "FALHA: Divergência"));
+        return success;
     }
 
     /**
      * Demonstra detalhadamente o tratamento de erros léxicos, sintáticos e
      * semânticos.
      */
-    private static void demonstrateErrorHandling() {
+    private static boolean demonstrateErrorHandling() {
         CompilerPipeline pipeline = new CompilerPipeline();
+        boolean allPassed = true;
 
         // 1. ERRO LÉXICO
         System.out.println("\n--- CASO 1: TRATAMENTO DE ERRO LEXICO ---");
@@ -333,6 +417,10 @@ public class Main {
         System.out.println("Status da Compilacao  : " + (resLex.success ? "SUCESSO" : "INTERROMPIDA COM SEGURANCA"));
         System.out.println("Etapa que detectou    : " + resLex.failedStage);
         System.out.println("Mensagem detalhada    : " + resLex.errorMessage);
+        if (resLex.success || !"Análise Léxica".equals(resLex.failedStage)) {
+            System.err.println("   [FALHA] Erro léxico não foi detectado ou tratado adequadamente!");
+            allPassed = false;
+        }
 
         // 2. ERRO SINTÁTICO
         System.out.println("\n--- CASO 2: TRATAMENTO DE ERRO SINTATICO ---");
@@ -341,6 +429,10 @@ public class Main {
         System.out.println("Status da Compilacao  : " + (resSint.success ? "SUCESSO" : "INTERROMPIDA COM SEGURANCA"));
         System.out.println("Etapa que detectou    : " + resSint.failedStage);
         System.out.println("Mensagem detalhada    : " + resSint.errorMessage);
+        if (resSint.success || !"Análise Sintática".equals(resSint.failedStage)) {
+            System.err.println("   [FALHA] Erro sintático não foi detectado ou tratado adequadamente!");
+            allPassed = false;
+        }
 
         // 3. ERRO SEMÂNTICO
         System.out.println("\n--- CASO 3: TRATAMENTO DE ERROS SEMANTICOS ---");
@@ -352,5 +444,11 @@ public class Main {
         for (SemanticError e : resSem.semanticErrors) {
             System.out.println("   " + e);
         }
+        if (resSem.success || !"Análise Semântica".equals(resSem.failedStage) || resSem.semanticErrors.isEmpty()) {
+            System.err.println("   [FALHA] Erro semântico não foi detectado ou tratado adequadamente!");
+            allPassed = false;
+        }
+
+        return allPassed;
     }
 }

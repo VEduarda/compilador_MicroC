@@ -3,11 +3,16 @@ package backend;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Representa o resultado da execução do programa no back-end (Interpretador de TAC).
+ *
+ * Preserva o estado de memória de todas as variáveis, garantindo que variáveis
+ * de escopos diferentes (com sombreamento/shadowing) mantenham sua identidade
+ * distinta e valores íntegros.
  */
 public class ExecutionResult {
 
@@ -35,8 +40,58 @@ public class ExecutionResult {
         memory.put(name, value);
     }
 
+    /**
+     * Retorna o valor de uma variável. Se a variável exata não for encontrada,
+     * verifica se existe uma versão qualificada com escopo (ex.: x_1).
+     */
     public Object getVariable(String name) {
+        if (memory.containsKey(name)) {
+            return memory.get(name);
+        }
+        for (Map.Entry<String, Object> entry : memory.entrySet()) {
+            if (entry.getKey().startsWith(name + "_")) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Retorna o valor de uma variável em um nível específico de escopo.
+     * Escopo 0 corresponde à variável global/externa; escopos > 0 aos blocos aninhados.
+     */
+    public Object getVariable(String name, int scopeLevel) {
+        if (scopeLevel == 0) {
+            if (memory.containsKey(name)) return memory.get(name);
+            if (memory.containsKey(name + "_0")) return memory.get(name + "_0");
+        }
+        String scopedName = name + "_" + scopeLevel;
+        if (memory.containsKey(scopedName)) {
+            return memory.get(scopedName);
+        }
         return memory.get(name);
+    }
+
+    /**
+     * Retorna todas as instâncias existentes de uma variável por identificador de escopo.
+     */
+    public Map<String, Object> getVariableInstances(String baseName) {
+        Map<String, Object> instances = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : memory.entrySet()) {
+            String key = entry.getKey();
+            if (key.equals(baseName) || key.matches("^" + java.util.regex.Pattern.quote(baseName) + "_\\d+$")) {
+                instances.put(key, entry.getValue());
+            }
+        }
+        return instances;
+    }
+
+    public boolean hasVariable(String name) {
+        if (memory.containsKey(name)) return true;
+        for (String key : memory.keySet()) {
+            if (key.startsWith(name + "_")) return true;
+        }
+        return false;
     }
 
     public Map<String, Object> getMemory() {
@@ -84,7 +139,12 @@ public class ExecutionResult {
         for (String key : sortedKeys) {
             // Não polui com temporárias internas no resumo, foca nas variáveis do usuário
             if (!key.matches("^t\\d+$")) {
-                System.out.printf("   %-12s = %s%n", key, memory.get(key));
+                String scopeDesc = "";
+                int uscore = key.lastIndexOf('_');
+                if (uscore != -1 && key.substring(uscore + 1).matches("\\d+")) {
+                    scopeDesc = " (escopo " + key.substring(uscore + 1) + ")";
+                }
+                System.out.printf("   %-12s = %s%s%n", key, memory.get(key), scopeDesc);
             }
         }
 
